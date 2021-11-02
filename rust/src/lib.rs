@@ -1,5 +1,8 @@
 use pyo3::prelude::*;
 
+mod small_set_flip;
+mod error_correcting_code;
+
 #[pyfunction]
 fn test_func(val : &str) -> PyResult<usize> {
     Ok(val.len())
