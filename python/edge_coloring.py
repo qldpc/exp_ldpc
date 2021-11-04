@@ -1,6 +1,5 @@
 import networkx as nx
 from networkx.algorithms import bipartite
-import itertools
 from collections import namedtuple
 import numpy as np
 
@@ -13,7 +12,9 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
     This uses the construction in Konz's proof that all bipartite graphs are class 1.'''
 
     G = bipartite_graph.to_undirected()
-    vertex_coloring = bipartite.color(G)
+
+    if not nx.is_bipartite(G):
+        raise RuntimeError("Graph must be bipartite")
 
     if nx.number_of_selfloops(G) > 0:
         raise RuntimeError("Graph must not contain self loops")
@@ -50,19 +51,10 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
                 if canonicalize_edge(uv_edge) in u_set.edges:
                     u_to_v_set.add(canonicalize_edge(uv_edge))
                 else:
-                    assert canonicalize_edge(uv_edge) in v_set.edges
                     v_to_u_set.add(canonicalize_edge(uv_edge))
 
             u_to_v_vertices = set(v for edges in u_to_v_set for v in edges)
             v_to_u_vertices = set(v for edges in v_to_u_set for v in edges)
-
-            assert u not in u_set.vertices
-            assert v not in v_set.vertices
-            assert v not in v_to_u_vertices
-            if v in u_set.vertices:
-                assert v in u_to_v_vertices
-
-            pre_length = len(u_set.edges) + len(v_set.edges)
 
             u_set.edges.difference_update(u_to_v_set)
             u_set.vertices.difference_update(u_to_v_vertices)
@@ -74,14 +66,7 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
             v_set.edges.update(u_to_v_set)
             v_set.vertices.update(u_to_v_vertices)
 
-            assert pre_length == len(u_set.edges) + len(v_set.edges)
-            assert u not in u_set.vertices
-            assert v not in u_set.vertices
-
         # Add the original edge
-        assert u not in u_set.vertices
-        assert v not in u_set.vertices
-        assert canonicalize_edge(edge) not in u_set.edges
         u_set.vertices.add(u)
         u_set.vertices.add(v)
         u_set.edges.add(canonicalize_edge(edge))
@@ -105,6 +90,7 @@ def test_bipartite_edge_coloring():
             # Each edge is colored exactly once
             assert sum(1 for coloring in colored_sets if canonicalize_edge(edge) in coloring) == 1
         for node in test_graph.nodes():
+            # The number of unique colors incident to a vertex is equal to the degree
             adjacent_colors = list(map(lambda e: next(i for (i,c) in enumerate(colored_sets) if canonicalize_edge(e) in c), test_graph.edges(node)))
             assert len(adjacent_colors) == len(set(adjacent_colors))
 
