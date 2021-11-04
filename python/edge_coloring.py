@@ -4,13 +4,13 @@ import itertools
 from collections import namedtuple
 import numpy as np
 
+def canonicalize_edge(e):
+    (u,v) = e
+    return (u,v) if u < v else (v,u)
+
 def edge_color_bipartite(bipartite_graph : nx.Graph):
     '''Given a bipartite graph, return an optimal edge coloring in time O(|VG||EG|).
     This uses the construction in Konz's proof that all bipartite graphs are class 1.'''
-
-    def canonicalize_edge(e):
-        (u,v) = e
-        return (u,v) if u < v else (v,u)
 
     G = bipartite_graph.to_undirected()
     vertex_coloring = bipartite.color(G)
@@ -19,6 +19,7 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
         raise RuntimeError("Graph must not contain self loops")
 
     graph_degree = max(map(lambda x: x[1], G.degree()))
+    print(f'Graph Degree: {graph_degree}')
 
     ColorSet = namedtuple('ColorSets', ['vertices', 'edges'])
     colorings = [ColorSet(set(), set()) for _ in range(graph_degree)]
@@ -29,8 +30,6 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
         try:
             u_set = next(x for x in colorings if u not in x.vertices and v not in x.vertices)
         except StopIteration: # There does not exist a set that does not contain u and does not contain v
-            print([len(x.edges) for x in colorings])
-
             u_set = next(x for x in colorings if u not in x.vertices)
             v_set = next(x for x in colorings if v not in x.vertices)
 
@@ -43,20 +42,45 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
                 filter_edge = lambda u, v: (canonicalize_edge((u,v)) in u_set.edges or canonicalize_edge((u,v)) in v_set.edges))
 
             # Fix edge coloring in u_set and v_set so we can add edge
-            uv_component_subgraph = uv_subgraph.subgraph(nx.descendants(uv_subgraph, u))
-            for uv_edge in uv_component_subgraph:
-                # Each set contains disjoint edges so we remove/add the vertices accordingly 
-                (remove_set, add_set) = (u_set, v_set) if canonicalize_edge(uv_edge) in u_set.edges else (v_set, u_set)
+            # We do this by following the chain of edges incident to v and swapping all the colors in this chain
+            # ==v_set== u      v ==u_set== x ==v_set== x ==u_set== ....
 
-                remove_set.edges.remove(canonicalize_edge(uv_edge))
-                remove_set.vertices.remove(uv_edge[0])
-                remove_set.vertices.remove(uv_edge[1])
+            u_to_v_set = set()
+            v_to_u_set = set()
+            for uv_edge in nx.edge_dfs(uv_subgraph, v):
+                if canonicalize_edge(uv_edge) in u_set.edges:
+                    u_to_v_set.add(canonicalize_edge(uv_edge))
+                else:
+                    assert canonicalize_edge(uv_edge) in v_set.edges
+                    v_to_u_set.add(canonicalize_edge(uv_edge))
 
-                add_set.edges.add(canonicalize_edge(uv_edge))
-                add_set.vertices.add(uv_edge[0])
-                add_set.vertices.add(uv_edge[1])
+            u_to_v_vertices = set(v for edges in u_to_v_set for v in edges)
+            v_to_u_vertices = set(v for edges in v_to_u_set for v in edges)
+
+            assert u not in u_set.vertices
+            assert v not in v_set.vertices
+            assert v not in v_to_u_vertices
+
+            if v in u_set.vertices:
+                assert v in u_to_v_vertices
+                
+            u_set.edges.difference_update(u_to_v_set)
+            u_set.vertices.difference_update(u_to_v_vertices)
+            u_set.edges.union(v_to_u_set)
+            u_set.vertices.union(v_to_u_vertices)
+
+            v_set.edges.difference_update(v_to_u_set)
+            v_set.vertices.difference_update(v_to_u_vertices)
+            v_set.edges.union(u_to_v_set)
+            v_set.vertices.union(u_to_v_vertices)
+
+            assert u not in u_set.vertices
+            assert v not in u_set.vertices
 
         # Add the original edge
+        assert u not in u_set.vertices
+        assert v not in u_set.vertices
+        assert canonicalize_edge(edge) not in u_set.edges
         u_set.vertices.add(u)
         u_set.vertices.add(v)
         u_set.edges.add(canonicalize_edge(edge))
@@ -74,13 +98,14 @@ def test_bipartite_edge_coloring():
 
         colored_sets = edge_color_bipartite(test_graph)
 
+        assert(len(colored_sets) == max(map(lambda x: x[1], test_graph.degree())))
+
         for edge in test_graph.edges():
             # Each edge is colored exactly once
             assert sum(1 for coloring in colored_sets if edge in coloring) == 1
-
         for node in test_graph.nodes():
-            # Any two edges incident to a node have different colors
-            assert test_graph.degree(node) == len(set(map(lambda e: next(i for (i,c) in enumerate(colored_sets)), test_graph.edges(node))))
+            adjacent_colors = list(map(lambda e: next(i for (i,c) in enumerate(colored_sets) if canonicalize_edge(e) in c), test_graph.edges(node)))
+            assert len(adjacent_colors) == len(set(adjacent_colors))
 
 
 
