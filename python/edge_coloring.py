@@ -3,7 +3,7 @@ from networkx.algorithms import bipartite
 from collections import namedtuple
 import numpy as np
 
-def canonicalize_edge(e):
+def _canonicalize_edge(e):
     (u,v) = e
     return (u,v) if u < v else (v,u)
 
@@ -39,7 +39,7 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
 
             uv_subgraph = nx.subgraph_view(G,
                 filter_node = lambda x: (x in u_set.vertices or x in v_set.vertices),
-                filter_edge = lambda u, v: (canonicalize_edge((u,v)) in u_set.edges or canonicalize_edge((u,v)) in v_set.edges))
+                filter_edge = lambda u, v: (_canonicalize_edge((u,v)) in u_set.edges or _canonicalize_edge((u,v)) in v_set.edges))
 
             # Fix edge coloring in u_set and v_set so we can add edge
             # We do this by following the chain of edges incident to v and swapping all the colors in this chain
@@ -48,10 +48,10 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
             u_to_v_set = set()
             v_to_u_set = set()
             for uv_edge in nx.edge_dfs(uv_subgraph, v):
-                if canonicalize_edge(uv_edge) in u_set.edges:
-                    u_to_v_set.add(canonicalize_edge(uv_edge))
+                if _canonicalize_edge(uv_edge) in u_set.edges:
+                    u_to_v_set.add(_canonicalize_edge(uv_edge))
                 else:
-                    v_to_u_set.add(canonicalize_edge(uv_edge))
+                    v_to_u_set.add(_canonicalize_edge(uv_edge))
 
             u_to_v_vertices = set(v for edges in u_to_v_set for v in edges)
             v_to_u_vertices = set(v for edges in v_to_u_set for v in edges)
@@ -69,7 +69,7 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
         # Add the original edge
         u_set.vertices.add(u)
         u_set.vertices.add(v)
-        u_set.edges.add(canonicalize_edge(edge))
+        u_set.edges.add(_canonicalize_edge(edge))
     
     return [v.edges for v in colorings]
 
@@ -88,10 +88,10 @@ def test_bipartite_edge_coloring():
 
         for edge in test_graph.edges():
             # Each edge is colored exactly once
-            assert sum(1 for coloring in colored_sets if canonicalize_edge(edge) in coloring) == 1
+            assert sum(1 for coloring in colored_sets if _canonicalize_edge(edge) in coloring) == 1
         for node in test_graph.nodes():
             # The number of unique colors incident to a vertex is equal to the degree
-            adjacent_colors = list(map(lambda e: next(i for (i,c) in enumerate(colored_sets) if canonicalize_edge(e) in c), test_graph.edges(node)))
+            adjacent_colors = list(map(lambda e: next(i for (i,c) in enumerate(colored_sets) if _canonicalize_edge(e) in c), test_graph.edges(node)))
             assert len(adjacent_colors) == len(set(adjacent_colors))
 
 
