@@ -4,7 +4,7 @@ from collections import namedtuple
 import numpy as np
 
 def _canonicalize_edge(e):
-    (u,v) = e
+    (u,v) = e[:2] # [:2] in case the graph is weighted
     return (u,v) if u < v else (v,u)
 
 def edge_color_bipartite(bipartite_graph : nx.Graph):
@@ -25,7 +25,7 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
     colorings = [ColorSet(set(), set()) for _ in range(graph_degree)]
 
     for edge in G.edges():
-        (u, v) = edge
+        (u, v) = edge[:2]
         u_set = None
         try:
             u_set = next(x for x in colorings if u not in x.vertices and v not in x.vertices)
