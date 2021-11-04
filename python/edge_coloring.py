@@ -19,7 +19,6 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
         raise RuntimeError("Graph must not contain self loops")
 
     graph_degree = max(map(lambda x: x[1], G.degree()))
-    print(f'Graph Degree: {graph_degree}')
 
     ColorSet = namedtuple('ColorSets', ['vertices', 'edges'])
     colorings = [ColorSet(set(), set()) for _ in range(graph_degree)]
@@ -60,20 +59,22 @@ def edge_color_bipartite(bipartite_graph : nx.Graph):
             assert u not in u_set.vertices
             assert v not in v_set.vertices
             assert v not in v_to_u_vertices
-
             if v in u_set.vertices:
                 assert v in u_to_v_vertices
-                
+
+            pre_length = len(u_set.edges) + len(v_set.edges)
+
             u_set.edges.difference_update(u_to_v_set)
             u_set.vertices.difference_update(u_to_v_vertices)
-            u_set.edges.union(v_to_u_set)
-            u_set.vertices.union(v_to_u_vertices)
+            u_set.edges.update(v_to_u_set)
+            u_set.vertices.update(v_to_u_vertices)
 
             v_set.edges.difference_update(v_to_u_set)
             v_set.vertices.difference_update(v_to_u_vertices)
-            v_set.edges.union(u_to_v_set)
-            v_set.vertices.union(u_to_v_vertices)
+            v_set.edges.update(u_to_v_set)
+            v_set.vertices.update(u_to_v_vertices)
 
+            assert pre_length == len(u_set.edges) + len(v_set.edges)
             assert u not in u_set.vertices
             assert v not in u_set.vertices
 
@@ -102,7 +103,7 @@ def test_bipartite_edge_coloring():
 
         for edge in test_graph.edges():
             # Each edge is colored exactly once
-            assert sum(1 for coloring in colored_sets if edge in coloring) == 1
+            assert sum(1 for coloring in colored_sets if canonicalize_edge(edge) in coloring) == 1
         for node in test_graph.nodes():
             adjacent_colors = list(map(lambda e: next(i for (i,c) in enumerate(colored_sets) if canonicalize_edge(e) in c), test_graph.edges(node)))
             assert len(adjacent_colors) == len(set(adjacent_colors))
