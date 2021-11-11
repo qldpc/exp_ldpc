@@ -27,7 +27,7 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     if check_complex:
         assert np.all((partial_1 @ partial_2).data % 2 == 0)
 
-    return (partial_2, partial_1, num_cols(partial_1))
+    return (partial_2.tocsc(), partial_1.tocsr(), num_cols(partial_1))
 
 def biregular_hpg(num_data : int, data_degree : int, check_degree : int, seed=None) -> QuantumCodeChecks:
     ''' Constructs a hypergraph product code defined by a single (data_degree, check_degree)-regular bipartite graph
@@ -62,7 +62,7 @@ def biregular_hpg(num_data : int, data_degree : int, check_degree : int, seed=No
 
     (partial_2, partial_1, num_qubits) = homological_product(boundary_map, coboundary_map, check_complex=True)
 
-    (x_checks, z_checks) = (partial_2.transpose(), partial_1)
+    (x_checks, z_checks) = (partial_2.transpose().tocsr(), partial_1.tocsr())
 
     assert x_checks.shape == z_checks.shape # If we A (x) A instead of A (x) A* we get different shapes???
     assert num_qubits == (num_data**2 + num_checks**2)
