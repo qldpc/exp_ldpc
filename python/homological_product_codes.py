@@ -27,7 +27,7 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     if check_complex:
         assert np.all((partial_1 @ partial_2).data % 2 == 0)
 
-    return (partial_2, partial_1)
+    return (partial_2, partial_1, num_cols(partial_1))
 
 def biregular_hpg(num_data : int, data_degree : int, check_degree : int, seed=None) -> QuantumCodeChecks:
     ''' Constructs a hypergraph product code defined by a single (data_degree, check_degree)-regular bipartite graph
@@ -60,18 +60,19 @@ def biregular_hpg(num_data : int, data_degree : int, check_degree : int, seed=No
     # There's more check nodes than data nodes when we consider them as swapped
     coboundary_map = boundary_map.transpose()
 
-    (partial_2, partial_1) = homological_product(boundary_map, coboundary_map, check_complex=True)
+    (partial_2, partial_1, num_qubits) = homological_product(boundary_map, coboundary_map, check_complex=True)
 
     (x_checks, z_checks) = (partial_2.transpose(), partial_1)
+
     assert x_checks.shape == z_checks.shape # If we A (x) A instead of A (x) A* we get different shapes???
-    assert num_cols(x_checks) == (num_data**2 + num_checks**2)
-    return (x_checks, z_checks)
+    assert num_qubits == (num_data**2 + num_checks**2)
+    return (x_checks, z_checks, num_qubits)
 
 def random_test_hpg():
     return biregular_hpg(36, 3, 4, seed=670235982)
 
 def test_smoketest_biregular_hpg():
-    (x_checks, z_checks) = random_test_hpg()
+    (x_checks, z_checks, _) = random_test_hpg()
 
     assert np.all((x_checks @ z_checks.transpose()).data%2 == 0)
     print(z_checks.sum(1))
