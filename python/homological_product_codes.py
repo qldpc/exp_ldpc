@@ -3,16 +3,10 @@ import networkx as nx
 import itertools
 from typing import Tuple
 import numpy as np
+from qecc_util import QuantumCodeChecks, num_cols, num_rows
 
-def num_rows(a):
-    assert(len(a.shape) == 2)
-    return a.shape[0]
 
-def num_cols(a):
-    assert(len(a.shape) == 2)
-    return a.shape[1]
-
-def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix, check_complex = None) -> Tuple[sparse.spmatrix, sparse.spmatrix]:
+def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix, check_complex = None) -> QuantumCodeChecks:
     '''Compute the homological product of two 2-complexes defined by their non-trivial boundary map
         Returns pair of boundary maps (partial_2, partial_1) of the total complex
     '''
@@ -35,7 +29,7 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
 
     return (partial_2, partial_1)
 
-def biregular_hpg(num_data : int, data_degree : int, check_degree : int, seed=None) -> Tuple[sparse.spmatrix, sparse.spmatrix]:
+def biregular_hpg(num_data : int, data_degree : int, check_degree : int, seed=None) -> QuantumCodeChecks:
     ''' Constructs a hypergraph product code defined by a single (data_degree, check_degree)-regular bipartite graph
         In the classical code, the check nodes represent a basis of 1-chains and the data nodes represent a basis of 0-chains.
         The boundary map from 1-chains to 0-chains gives the neighborhood of data nodes.
