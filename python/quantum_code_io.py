@@ -25,7 +25,7 @@ def read_check_generators(stream : IOBase, validate_stabilizer_code = None) -> Q
     x_checks = []
     z_checks = []
 
-    for l in lines:
+    for l in lines[1:]:
         support = [int(v) for v in l[:-1]]
         check_type = l[-1]
         if check_type != 'X' and check_type != 'Z':
@@ -49,21 +49,40 @@ def read_check_generators(stream : IOBase, validate_stabilizer_code = None) -> Q
     z_checks = make_check_matrix(z_checks, qubit_count)
 
     if validate_stabilizer_code is True:
-        if len(z_checks) != len(x_checks):
-            raise RuntimeError(f'Number of X and Z checks does not match')
-
         if not np.all((x_checks @ z_checks.transpose()).data%2 == 0):
             raise RuntimeError(f'X and Z checks do not generate an abelian group')
 
-    return (x_checks, z_checks)
+    return (x_checks, z_checks, qubit_count)
 
 def write_check_generators(stream : IOBase, checks : QuantumCodeChecks):
     (x_checks, z_checks, num_qubits) = checks
     
     assert num_cols(x_checks) == num_cols(z_checks)
     assert num_cols(x_checks) == num_qubits
+    # Header
+    stream.write(f'qecc {num_qubits} {num_rows(x_checks)} {num_rows(z_checks)}\n')
+    # Check generators for each type
+    for (check_type, check_matrix) in (('X', x_checks), ('Z', z_checks)):
+        for row_index in range(num_rows(check_matrix)):
+            col_list = " ".join(str(col) for col in sparse.find(check_matrix[row_index, :])[1])
+            stream.write(f'{col_list} {check_type}\n')
 
-    stream.write(f'qecc {num_qubits} {num_rows(x_checks)} {num_rows(z_checks)}')
-    stream.writelines(f'{" ".join(str(col) for (_, col, _) in sparse.find(x_checks[row_index, :]))} X' for row_index in range(num_rows(x_checks)))
-    stream.writelines(f'{" ".join(str(col) for (_, col, _) in sparse.find(x_checks[row_index, :]))} Z' for row_index in range(num_rows(z_checks)))
+def test_check_io():
+    from .code_examples import d3_rotated_surface_code, random_test_hpg
+    from io import StringIO
+
+    for checks in [d3_rotated_surface_code(), random_test_hpg()]:
+        # Write the code out
+        test_buffer = StringIO()
+        write_check_generators(test_buffer, checks)
+
+        # Read it back
+        test_buffer.seek(0)
+        new_checks = read_check_generators(test_buffer, validate_stabilizer_code=True)
+
+        # Should be identity
+        assert (new_checks[0] != checks[0]).nnz == 0
+        assert (new_checks[1] != checks[1]).nnz == 0
+        assert new_checks[2] == checks[2]
+
 
