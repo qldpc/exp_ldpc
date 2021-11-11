@@ -2,8 +2,8 @@ import stim
 import networkx as nx
 from networkx.algorithms import bipartite
 import scipy.sparse as sparse
-from edge_coloring import edge_color_bipartite
-from qecc_util import num_rows, QuantumCodeChecks, QuantumCodeLogicals
+from .edge_coloring import edge_color_bipartite
+from .qecc_util import num_rows, QuantumCodeChecks, QuantumCodeLogicals
 
 def order_measurements(checks : QuantumCodeChecks) -> tuple[int, tuple[int, dict[int, int]], tuple[int, dict[int, int]]]:
     '''Returns an ordering of measuremnts for X and Z checks. For now we schedule X and Z checks separately'''

@@ -3,7 +3,7 @@ import networkx as nx
 import itertools
 from typing import Tuple
 import numpy as np
-from qecc_util import QuantumCodeChecks, num_cols, num_rows
+from .qecc_util import QuantumCodeChecks, num_cols, num_rows
 
 
 def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix, check_complex = None) -> QuantumCodeChecks:
@@ -67,9 +67,11 @@ def biregular_hpg(num_data : int, data_degree : int, check_degree : int, seed=No
     assert num_cols(x_checks) == (num_data**2 + num_checks**2)
     return (x_checks, z_checks)
 
+def random_test_hpg():
+    return biregular_hpg(36, 3, 4, seed=670235982)
 
 def test_smoketest_biregular_hpg():
-    (x_checks, z_checks) = biregular_hpg(36, 3, 4, seed=670235982)
+    (x_checks, z_checks) = random_test_hpg()
 
     assert np.all((x_checks @ z_checks.transpose()).data%2 == 0)
     print(z_checks.sum(1))

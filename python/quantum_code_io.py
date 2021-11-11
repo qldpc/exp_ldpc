@@ -2,8 +2,7 @@ from io import IOBase
 import scipy
 from scipy import sparse
 import numpy as np
-from qecc_util import QuantumCodeChecks, make_check_matrix, num_rows, num_cols
-
+from .qecc_util import QuantumCodeChecks, make_check_matrix, num_rows, num_cols
 
 def read_check_generators(stream : IOBase, validate_stabilizer_code = None) -> QuantumCodeChecks:
     if validate_stabilizer_code is None:
