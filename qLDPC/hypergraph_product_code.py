@@ -1,4 +1,4 @@
-from homological_product_code import homological_product
+from .homological_product_code import homological_product
 import networkx as nx
 import numpy as np
 from .qecc_util import QuantumCodeChecks, num_cols, num_rows
