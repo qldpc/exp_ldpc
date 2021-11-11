@@ -44,6 +44,11 @@ def find_logicals(checks : QuantumCodeChecks) -> QuantumCodeLogicals:
 
     return (find_logical_single_basis(x_checks, z_checks), find_logical_single_basis(z_checks, x_checks), num_qubits)
 
+def test_find_logicals():
+    from .code_examples import d3_rotated_surface_code
+    checks = d3_rotated_surface_code()
+    logicals = find_logicals(checks)
+
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         print('''
