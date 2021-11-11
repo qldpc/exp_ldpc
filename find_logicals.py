@@ -1,5 +1,5 @@
-from .quantum_code_io import read_check_generators, write_check_generators
-from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, num_rows, num_cols, make_check_matrix
+from qLDPC.quantum_code_io import read_check_generators, write_check_generators
+from qLDPC.qecc_util import QuantumCodeChecks, QuantumCodeLogicals, num_rows, num_cols, make_check_matrix
 from scipy import sparse
 from typing import Iterable, Set
 from sys import argv
