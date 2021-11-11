@@ -1,4 +1,4 @@
-from .homological_product_codes import random_test_hpg
+from .hypergraph_product_code import random_test_hpg
 from .qecc_util import QuantumCodeChecks, make_check_matrix
 
 
