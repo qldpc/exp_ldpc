@@ -17,6 +17,9 @@ pub struct ErrorCorrectingCode {
     tanner_graph : UnGraph<TannerGraphNode, ()>,
 }
 
+pub trait Decoder {
+    fn correct_syndrome(self : &mut Self, syndrome : &mut Vec<bool>, correction : &mut Vec<bool>);
+}
 
 #[pymethods]
 impl ErrorCorrectingCode {

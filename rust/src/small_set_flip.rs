@@ -3,7 +3,7 @@ use std::collections::BinaryHeap;
 use std::cmp::Ordering;
 use enum_as_inner::EnumAsInner;
 
-use crate::error_correcting_code::TannerGraphNode;
+use crate::error_correcting_code::{TannerGraphNode, Decoder};
 
 #[derive(Debug, Clone)]
 struct CheckNode {
@@ -67,8 +67,10 @@ impl SmallSetFlip {
 
         SmallSetFlip{bit_node_count, check_node_count, flip_set_size_heap:BinaryHeap::new(), tanner_graph:ssf_tanner_graph}
     }
+}
 
-    pub fn correct_syndrome(self : &mut Self, mut syndrome : Vec<bool>, mut correction : Vec<bool>) {
+impl Decoder for SmallSetFlip { 
+    fn correct_syndrome(self : &mut Self, syndrome : &mut Vec<bool>, correction : &mut Vec<bool>) {
         assert!(syndrome.len() == self.check_node_count);
         
         // Initialize correction vector
@@ -83,7 +85,7 @@ impl SmallSetFlip {
         self.flip_set_size_heap.clear();
         for node_idx in self.tanner_graph.node_indices() {
             if let SsfTannerGraphNode::BitNode(BitNode {idx, flip_set_size:_}) = self.tanner_graph[node_idx] {
-                let new_flip_set_size = check_flip_set_size(node_idx, &syndrome, &self.tanner_graph);
+                let new_flip_set_size = check_flip_set_size(node_idx, syndrome, &self.tanner_graph);
 
                 self.tanner_graph[node_idx] = SsfTannerGraphNode::BitNode(BitNode {idx, flip_set_size:new_flip_set_size});
 
