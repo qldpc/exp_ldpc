@@ -22,6 +22,7 @@ pub struct ErrorCorrectingCode {
 pub trait Decoder {
     /// A syndrome bit is true if it is non-trivial
     /// A correction bit is true if it supports a non-trivial correction
+    /// The syndrome vector is clobbered and correction will contain a recovery operator
     fn correct_syndrome(self : &mut Self, syndrome : &mut Vec<bool>, correction : &mut Vec<bool>);
 }
 
