@@ -6,7 +6,7 @@ use std::{collections::HashSet, hash::Hash};
 use petgraph::graph::UnGraph;
 use enum_as_inner::EnumAsInner;
 
-#[derive(Debug, EnumAsInner)]
+#[derive(Debug, EnumAsInner, Clone)]
 pub enum TannerGraphNode {
     CheckNode(usize),
     BitNode(usize),

@@ -5,24 +5,24 @@ use enum_as_inner::EnumAsInner;
 
 use crate::error_correcting_code::TannerGraphNode;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct CheckNode {
     idx : usize
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct BitNode {
     idx : usize,
     flip_set_size : i32,
 }
 
-#[derive(Debug, EnumAsInner)]
+#[derive(Debug, Clone, EnumAsInner)]
 enum SsfTannerGraphNode {
     CheckNode(CheckNode),
     BitNode(BitNode),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SmallSetFlip {
     tanner_graph : UnGraph<SsfTannerGraphNode, ()>,
     flip_set_size_heap : BinaryHeap<FlipSizeHeapElement>,
@@ -32,7 +32,7 @@ pub struct SmallSetFlip {
     // Use same stale element heap tracking trick as UFD
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct FlipSizeHeapElement {
     node_idx : NodeIndex,
     flipped_set_size : i32,
