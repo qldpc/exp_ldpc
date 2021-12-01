@@ -1,10 +1,12 @@
 use pyo3::prelude::*;
 use pyo3::exceptions::PyRuntimeError;
 
-use std::{collections::HashSet, hash::Hash};
+use std::collections::HashSet;
 
-use petgraph::graph::UnGraph;
+use petgraph::{graph::DiGraph, visit::EdgeRef};
 use enum_as_inner::EnumAsInner;
+
+pub type TannerGraph = DiGraph<TannerGraphNode, ()>;
 
 #[derive(Debug, EnumAsInner, Clone)]
 pub enum TannerGraphNode {
@@ -14,10 +16,12 @@ pub enum TannerGraphNode {
 
 #[pyclass]
 pub struct ErrorCorrectingCode {
-    tanner_graph : UnGraph<TannerGraphNode, ()>,
+    tanner_graph : TannerGraph,
 }
 
 pub trait Decoder {
+    /// A syndrome bit is true if it is non-trivial
+    /// A correction bit is true if it supports a non-trivial correction
     fn correct_syndrome(self : &mut Self, syndrome : &mut Vec<bool>, correction : &mut Vec<bool>);
 }
 
@@ -38,7 +42,7 @@ impl ErrorCorrectingCode {
         if (0..num_bits).collect::<HashSet<_>>().difference(&data_indices).count() > 0 { Err(PyErr::new::<PyRuntimeError, _>("Data bit indices not contiguous")) } else { Ok(()) }?;
 
         // Build tanner graph
-        let mut tanner_graph = UnGraph::default();
+        let mut tanner_graph = DiGraph::default();
 
         let check_node_indices = (0..num_checks).map(|i| tanner_graph.add_node(TannerGraphNode::CheckNode(i))).collect::<Vec<_>>();
         let bit_node_indices = (0..num_bits).map(|i| tanner_graph.add_node(TannerGraphNode::BitNode(i))).collect::<Vec<_>>();
@@ -51,4 +55,12 @@ impl ErrorCorrectingCode {
 
         Ok(ErrorCorrectingCode {tanner_graph})
     }
+}
+
+/// Returns true if edges are directed from checks to bits
+pub fn tanner_graph_edge_orientation(tanner_graph : &TannerGraph) -> bool {
+    tanner_graph.edge_references().all(|edge_ref|
+           tanner_graph[edge_ref.source()].as_check_node().is_some()
+        && tanner_graph[edge_ref.target()].as_bit_node().is_some()
+    )
 }
