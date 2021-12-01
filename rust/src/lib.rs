@@ -1,6 +1,8 @@
 use pyo3::prelude::*;
 
 mod small_set_flip;
+mod first_min_belief_prop;
+mod first_min_bp_plus_ssf;
 mod error_correcting_code;
 
 #[pyfunction]
