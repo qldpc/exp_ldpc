@@ -49,6 +49,7 @@ impl FirstMinBeliefProp {
         }
     }
 
+    /// Bits to checks belief propagation step
     fn update_bit_to_checks_messages(self : &mut Self) {
         for update_edge_idx in self.tanner_graph.edge_indices() {
             let (check_node_idx, bit_node_idx) = self.tanner_graph.edge_endpoints(update_edge_idx).unwrap();
@@ -63,6 +64,7 @@ impl FirstMinBeliefProp {
         }
     }
 
+    /// Checks to bits belief propagation step
     fn update_check_to_bits_messages(self : &mut Self, syndrome : &Vec<bool>) {
         for update_edge_idx in self.tanner_graph.edge_indices() {
             let (check_node_idx, bit_node_idx) = self.tanner_graph.edge_endpoints(update_edge_idx).unwrap();
@@ -81,9 +83,55 @@ impl FirstMinBeliefProp {
         }
     }
 
+    /// Propagate the beliefs
     fn sum_product_step(self : &mut Self, syndrome : &Vec<bool>) {
         self.update_check_to_bits_messages(syndrome);
         self.update_bit_to_checks_messages();
+    }
+
+    /// Compute the change in syndrome and correction vectors from the last round
+    fn update_diffs(self : &mut Self, correction : &Vec<bool>) {
+        // Init diffs
+        self.syndrome_diff.fill(false);
+        self.correction_diff.fill(false);
+
+        // Compute correction diff
+        for node_idx in self.tanner_graph.node_indices() {
+            if let TannerGraphNode::BitNode(bit_idx) = self.tanner_graph[node_idx] {
+                // Prior + sum of incoming messages
+                let bit_log_likelihood = self.prior_log_likelihood + self.tanner_graph.edges_directed(node_idx, Incoming).map(
+                        |edge_ref| self.check_to_bit_message[*edge_ref.weight()]).sum::<f64>();
+                // Positive is trivial
+                let new_bit_correction = bit_log_likelihood < 0.0;
+                self.correction_diff[bit_idx] = new_bit_correction ^ correction[bit_idx];
+            }
+        }
+
+        // Compute syndrome diff
+        for node_idx in self.tanner_graph.node_indices() {
+            if let TannerGraphNode::CheckNode(check_idx) = self.tanner_graph[node_idx] {
+                let non_triv_diff = self.tanner_graph.neighbors(node_idx).map(|node_idx| {
+                        let bit_idx = self.tanner_graph[node_idx].as_bit_node().unwrap();
+                        self.correction_diff[*bit_idx]
+                    }).reduce(|a, b| a ^ b).unwrap();
+
+                self.syndrome_diff[check_idx] = non_triv_diff;
+            }
+        }
+    }
+
+    /// Apply the syndrome and correction differences to a given syndrome and correction vector
+    fn apply_diffs(self : &Self, syndrome : &mut Vec<bool> , correction : &mut Vec<bool>) {
+        for i in 0..correction.len() {
+            if self.correction_diff[i] {
+                correction[i] ^= true;
+            }
+        }
+        for i in 0..syndrome.len() {
+            if self.syndrome_diff[i] {
+                syndrome[i] ^= true;
+            }
+        }
     }
 }
 
@@ -103,51 +151,17 @@ impl Decoder for FirstMinBeliefProp {
             // Update messages
             self.sum_product_step(syndrome);
 
-            // Init diffs
-            self.syndrome_diff.fill(false);
-            self.correction_diff.fill(false);
-
-            // Compute correction diff
-            for node_idx in self.tanner_graph.node_indices() {
-                if let TannerGraphNode::BitNode(bit_idx) = self.tanner_graph[node_idx] {
-                    // Prior + sum of incoming messages
-                    let bit_log_likelihood = self.prior_log_likelihood + self.tanner_graph.edges_directed(node_idx, Incoming).map(
-                            |edge_ref| self.check_to_bit_message[*edge_ref.weight()]).sum::<f64>();
-                    // Positive is trivial
-                    let new_bit_correction = bit_log_likelihood < 0.0;
-                    self.correction_diff[bit_idx] = new_bit_correction ^ correction[bit_idx];
-                }
-            }
-    
-            // Compute syndrome diff
-            for node_idx in self.tanner_graph.node_indices() {
-                if let TannerGraphNode::CheckNode(check_idx) = self.tanner_graph[node_idx] {
-                    let non_triv_diff = self.tanner_graph.neighbors(node_idx).map(|node_idx| {
-                            let bit_idx = self.tanner_graph[node_idx].as_bit_node().unwrap();
-                            self.correction_diff[*bit_idx]
-                        }).reduce(|a, b| a ^ b).unwrap();
-
-                    self.syndrome_diff[check_idx] = non_triv_diff;
-                }
-            }
+            // Compute new diffs
+            self.update_diffs(correction);
             
             // Difference of syndrome weights
             // New syndrome weight - old syndrome weight
-            let weight_difference : i32 =syndrome.iter().zip(self.syndrome_diff.iter()).map(
+            let weight_difference : i32 = syndrome.iter().zip(self.syndrome_diff.iter()).map(
                 |(s, s_diff)| if *s_diff { if *s { -1 } else { 1 }} else { 0 }).sum();
 
             // If syndrome weight decreases then apply the diff and continue the loop
             if weight_difference < 0 {
-                for i in 0..correction.len() {
-                    if self.correction_diff[i] {
-                        correction[i] ^= true;
-                    }
-                }
-                for i in 0..syndrome.len() {
-                    if self.syndrome_diff[i] {
-                        syndrome[i] ^= true;
-                    }
-                }
+                self.apply_diffs(syndrome, correction);
                 continue;
             }
 
