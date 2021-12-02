@@ -98,17 +98,9 @@ impl SmallSetFlip {
             }
         }
     }
-}
 
-impl Decoder for SmallSetFlip { 
-    fn correct_syndrome(self : &mut Self, syndrome : &mut Vec<bool>, correction : &mut Vec<bool>) {
-        assert!(syndrome.len() == self.check_node_count);
-        
-        // Initialize correction vector
-        correction.resize(self.bit_node_count, false);
-        correction.fill(false);
-
-        // Initialize all flip set sizes
+    /// Initialize flip set size heap
+    fn init_flip_set_size_heap(self : &mut Self, syndrome : &Vec<bool>) {
         self.flip_set_size_heap.clear();
         for node_idx in self.tanner_graph.node_indices() {
             if let SsfTannerGraphNode::BitNode(BitNode {idx, flip_set_size:_}) = self.tanner_graph[node_idx] {
@@ -121,6 +113,18 @@ impl Decoder for SmallSetFlip {
                 });
             }
         }
+    }
+}
+
+impl Decoder for SmallSetFlip { 
+    fn correct_syndrome(self : &mut Self, syndrome : &mut Vec<bool>, correction : &mut Vec<bool>) {
+        assert!(syndrome.len() == self.check_node_count);
+        
+        // Initialize correction vector and flip set size heap
+        correction.resize(self.bit_node_count, false);
+        correction.fill(false);
+
+        self.init_flip_set_size_heap(syndrome);
 
         // ====== Inner loop ======
         // While there are candidate bits to flip
