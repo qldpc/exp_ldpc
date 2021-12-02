@@ -1,7 +1,6 @@
 import scipy.sparse as sparse
 import networkx as nx
 import itertools
-from typing import Tuple
 import numpy as np
 from .qecc_util import QuantumCodeChecks, num_cols, num_rows
 
