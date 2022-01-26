@@ -1,7 +1,7 @@
 use petgraph::{graph::{NodeIndex, DiGraph}, EdgeDirection::*, visit::{EdgeRef, IntoEdgesDirected, IntoNeighbors}};
 use enum_as_inner::EnumAsInner;
 
-use crate::error_correcting_code::{TannerGraph, tanner_graph_edge_orientation, TannerGraphNode, Decoder};
+use crate::error_correcting_code::{TannerGraph, tanner_graph_edge_orientation, TannerGraphNode, Decoder, ErrorCorrectingCode};
 
 /// First-min Belief Propagation from
 /// Grospellier et al., Quantum 5, 432 (2021).
@@ -18,8 +18,8 @@ pub struct FirstMinBeliefProp {
 }
 
 impl FirstMinBeliefProp {
-    pub fn new(tanner_graph : &TannerGraph, error_prior : f64) -> FirstMinBeliefProp {
-        assert!(tanner_graph_edge_orientation(tanner_graph));
+    pub fn new(ErrorCorrectingCode {logicals:_, tanner_graph} : &ErrorCorrectingCode, error_prior : f64) -> FirstMinBeliefProp {
+        assert!(tanner_graph_edge_orientation(&tanner_graph));
 
         let check_node_count = tanner_graph.node_indices().filter_map(|node_idx| tanner_graph[node_idx].as_check_node()).count();
         let bit_node_count = tanner_graph.node_indices().filter_map(|node_idx| tanner_graph[node_idx].as_bit_node()).count();

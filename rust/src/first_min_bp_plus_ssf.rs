@@ -1,4 +1,4 @@
-use crate::error_correcting_code::{TannerGraph, Decoder};
+use crate::error_correcting_code::{Decoder, ErrorCorrectingCode};
 use crate::first_min_belief_prop::FirstMinBeliefProp;
 use crate::small_set_flip::SmallSetFlip;
 
@@ -11,10 +11,10 @@ struct FirstMinBPplusSSF {
 }
 
 impl FirstMinBPplusSSF {
-    pub fn new(tanner_graph : &TannerGraph, error_prior : f64) -> FirstMinBPplusSSF {
+    pub fn new(code : &ErrorCorrectingCode, error_prior : f64) -> FirstMinBPplusSSF {
         FirstMinBPplusSSF {
-            belief_prop:FirstMinBeliefProp::new(tanner_graph, error_prior),
-            small_set_flip:SmallSetFlip::new(tanner_graph),
+            belief_prop:FirstMinBeliefProp::new(code, error_prior),
+            small_set_flip:SmallSetFlip::new(code),
         }
     }
 }
