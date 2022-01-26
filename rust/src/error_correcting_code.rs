@@ -38,14 +38,18 @@ impl ErrorCorrectingCode {
 
         // Consistency checks
         if num_checks == 0 { Err(PyErr::new::<PyRuntimeError, _>("Number of checks must be positive")) } else { Ok(()) }?;
-        checks.iter().map(|x| if x.len() == 0 { Err(PyErr::new::<PyRuntimeError, _>("Found empty check in list of checks")) } else { Ok(()) }).fold(Ok(()), |a : PyResult<_>, b| { a?; b?; Ok(()) })?;
+        checks.iter().map(|x| if x.len() == 0 { 
+            Err(PyErr::new::<PyRuntimeError, _>("Found empty check in list of checks")) 
+        } else { Ok(()) }).fold(Ok(()), |a : PyResult<_>, b| { a?; b?; Ok(()) })?;
 
         let data_indices = checks.iter().map(|x| x.iter()).flatten().map(|x| *x).collect::<HashSet<_>>();
         let num_qubits = data_indices.iter().max().unwrap() + 1;
         
-        if logicals.iter().map(|x| x.iter().max().unwrap()).max().map_or(false, |x| *x >= num_qubits) { Err(PyErr::new::<PyRuntimeError, _>("Invalid qubit index in logical")) } else { Ok(()) }?;
+        if logicals.iter().map(|x| x.iter().max().unwrap()).max().map_or(false, |x| *x >= num_qubits) { 
+            Err(PyErr::new::<PyRuntimeError, _>("Invalid qubit index in logical")) } else { Ok(()) }?;
 
-        if (0..num_qubits).collect::<HashSet<_>>().difference(&data_indices).count() > 0 { Err(PyErr::new::<PyRuntimeError, _>("Data bit indices not contiguous")) } else { Ok(()) }?;
+        if (0..num_qubits).collect::<HashSet<_>>().difference(&data_indices).count() > 0 { 
+            Err(PyErr::new::<PyRuntimeError, _>("Data bit indices not contiguous")) } else { Ok(()) }?;
 
         // Build tanner graph
         let mut tanner_graph = DiGraph::default();
@@ -74,10 +78,12 @@ impl ErrorCorrectingCode {
     }
 
     pub fn measure_logicals<'pyl>(&self, py: Python<'pyl>, measurement_outcomes : &PyArray1<bool>) -> PyResult<&'pyl PyArray1<bool>> {
-        if measurement_outcomes.shape()[0] != self.num_qubits { Err(PyErr::new::<PyRuntimeError, _>("Measurement number does not match number of qubits")) } else { Ok(()) }?;
+        if measurement_outcomes.shape()[0] != self.num_qubits { 
+            Err(PyErr::new::<PyRuntimeError, _>("Measurement number does not match number of qubits")) } else { Ok(()) }?;
         
-        let measurements = measurement_outcomes.readonly().as_slice()?;
-        Ok(PyArray1::from_iter(py, self.logicals.iter().map(|x| x.iter().map(|i| measurements.get(*i).unwrap()).fold(false, |a,b| a^b))))
+        // TODO: This is quadratic time so instrument overhead later
+        Ok(PyArray1::from_iter(py, self.logicals.iter().map(|x| x.iter()
+            .map(|i| *measurement_outcomes.readonly().get(*i).unwrap()).fold(false, |a,b| a^b))))
     }
 }
 

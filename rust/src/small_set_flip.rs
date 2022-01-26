@@ -53,7 +53,7 @@ impl Ord for FlipSizeHeapElement {
 }
 
 impl SmallSetFlip {
-    pub fn new(ErrorCorrectingCode {logicals:_, tanner_graph} : &ErrorCorrectingCode) -> SmallSetFlip {
+    pub fn new(ErrorCorrectingCode {tanner_graph, ..} : &ErrorCorrectingCode) -> SmallSetFlip {
         assert!(tanner_graph_edge_orientation(&tanner_graph));
 
         let check_node_count = tanner_graph.node_indices().filter_map(|node_idx| tanner_graph[node_idx].as_check_node()).count();
@@ -72,7 +72,8 @@ impl SmallSetFlip {
 
     /// Returns the signed size of the flip set (Net number of data nodes flipped from non-trivial to trivial)
     fn check_flip_set_size(self : &Self, bit_node_idx : NodeIndex, syndrome : &Vec<bool>) -> i32 {
-        self.tanner_graph.neighbors_undirected(bit_node_idx).map(|neighbor_idx| if syndrome[self.tanner_graph[neighbor_idx].as_check_node().unwrap().idx] { -1 } else { 1 }).sum()
+        self.tanner_graph.neighbors_undirected(bit_node_idx).map(|neighbor_idx| 
+                if syndrome[self.tanner_graph[neighbor_idx].as_check_node().unwrap().idx] { -1 } else { 1 }).sum()
     }
 
     /// Subroutine to update the flip set sizes when decoding

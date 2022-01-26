@@ -18,7 +18,7 @@ pub struct FirstMinBeliefProp {
 }
 
 impl FirstMinBeliefProp {
-    pub fn new(ErrorCorrectingCode {logicals:_, tanner_graph} : &ErrorCorrectingCode, error_prior : f64) -> FirstMinBeliefProp {
+    pub fn new(ErrorCorrectingCode {tanner_graph, ..} : &ErrorCorrectingCode, error_prior : f64) -> FirstMinBeliefProp {
         assert!(tanner_graph_edge_orientation(&tanner_graph));
 
         let check_node_count = tanner_graph.node_indices().filter_map(|node_idx| tanner_graph[node_idx].as_check_node()).count();
