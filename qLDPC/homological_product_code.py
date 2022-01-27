@@ -3,6 +3,7 @@ import networkx as nx
 import itertools
 import numpy as np
 from .qecc_util import QuantumCodeChecks, num_cols, num_rows
+from galois import GF
 
 def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix, check_complex = None) -> QuantumCodeChecks:
     '''Compute the homological product of two 2-complexes defined by their non-trivial boundary map

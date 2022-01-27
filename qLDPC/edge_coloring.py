@@ -1,13 +1,14 @@
 import networkx as nx
 from networkx.algorithms import bipartite
 from collections import namedtuple
+from typing import List, Set
 import numpy as np
 
 def _canonicalize_edge(e):
     (u,v) = e[:2] # [:2] in case the graph is weighted
     return (u,v) if u < v else (v,u)
 
-def edge_color_bipartite(bipartite_graph : nx.Graph) -> list[set[int]]:
+def edge_color_bipartite(bipartite_graph : nx.Graph) -> List[Set[int]]:
     '''Given a bipartite graph, return an optimal edge coloring in time O(|VG||EG|).
     This uses the construction in Konz's proof that all bipartite graphs are class 1.'''
 

@@ -1,9 +1,9 @@
-from typing import Iterable
+from typing import Iterable, Tuple
 from scipy import sparse
 import numpy as np
 
 
-QuantumCodeChecks = tuple[sparse.spmatrix, sparse.spmatrix, int]
+QuantumCodeChecks = Tuple[sparse.spmatrix, sparse.spmatrix, int]
 QuantumCodeLogicals = QuantumCodeChecks
 
 def num_rows(a : np.array) -> int:

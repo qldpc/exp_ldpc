@@ -2,13 +2,13 @@ import stim
 import networkx as nx
 from networkx.algorithms import bipartite
 import scipy.sparse as sparse
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Tuple, Dict, List
 from .edge_coloring import edge_color_bipartite
 from .qecc_util import num_rows, QuantumCodeChecks, QuantumCodeLogicals
 
-MeasurementOrder = tuple[int, dict[int, int]]
+MeasurementOrder = Tuple[int, Dict[int, int]]
 
-def order_measurements(checks : QuantumCodeChecks) -> tuple[int, MeasurementOrder, MeasurementOrder]:
+def order_measurements(checks : QuantumCodeChecks) -> Tuple[int, MeasurementOrder, MeasurementOrder]:
     '''Returns an ordering of measuremnts for X and Z checks. For now we schedule X and Z checks separately'''
     def build_meas_order_basis(checks):
         tanner_graph = bipartite.from_biadjacency_matrix(checks)
@@ -30,7 +30,7 @@ def order_measurements(checks : QuantumCodeChecks) -> tuple[int, MeasurementOrde
     
     return (len(data_nodes), build_meas_order_basis(checks[0]), build_meas_order_basis(checks[1]))
 
-def build_perfect_circuit(checks : QuantumCodeChecks) -> tuple(int, int, int, tuple[list[int], list[int], list[int]], list[str]):
+def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[int, int, int, Tuple[List[int], List[int], List[int]], List[str]]:
     '''Syndrome extraction circuit to measure X checks then Z checks'''
     (num_data_qubits, (x_check_count, x_check_schedule), (z_check_count, z_check_schedule)) = order_measurements(checks)
 
@@ -72,7 +72,7 @@ def rewrite_measurement_noise(p : float, circuit_line : str) -> str:
     assert(left_partition.isspace or len(left_partition) == 0)
     return f'{measurement}({p}){right_partition}'
 
-def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterable[int], ancilla_qubit_indices : Iterable[int], circuit : Iterable[str]) -> list[str]:
+def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterable[int], ancilla_qubit_indices : Iterable[int], circuit : Iterable[str]) -> List[str]:
     noisy_circuit = [rewrite_measurement_noise(pm, line) for line in circuit]
     noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(data_qubit_indices)}')
     noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(ancilla_qubit_indices)}')
@@ -80,7 +80,7 @@ def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterabl
 
 
 # TODO: We will rewrite the perfect circuit to insert the appropriate fault locations noise model
-def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], logicals : QuantumCodeLogicals, checks : QuantumCodeChecks, use_x_logicals = None) -> tuple[str, Callable[[int, bool, list], list], Callable[[list], list]]:
+def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], logicals : QuantumCodeLogicals, checks : QuantumCodeChecks, use_x_logicals = None) -> Tuple[str, Callable[[int, bool, list], list], Callable[[list], list]]:
     if use_x_logicals is None:
         use_x_logicals = False
 
