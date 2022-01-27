@@ -2,6 +2,7 @@ use petgraph::graph::{NodeIndex, DiGraph};
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
 use enum_as_inner::EnumAsInner;
+use pyo3::{pyclass, pymethods, PyResult};
 
 use crate::error_correcting_code::{Bitstring, tanner_graph_edge_orientation, TannerGraphNode, Decoder, ErrorCorrectingCode};
 
@@ -23,6 +24,7 @@ enum SsfTannerGraphNode {
 }
 
 #[derive(Debug, Clone)]
+#[pyclass]
 pub struct SmallSetFlip {
     tanner_graph : DiGraph<SsfTannerGraphNode, ()>,
     flip_set_size_heap : BinaryHeap<FlipSizeHeapElement>,
@@ -53,7 +55,7 @@ impl Ord for FlipSizeHeapElement {
 }
 
 impl SmallSetFlip {
-    pub fn new(ErrorCorrectingCode {tanner_graph, ..} : &ErrorCorrectingCode) -> SmallSetFlip {
+    pub fn new(ErrorCorrectingCode {tanner_graph, ..} : &ErrorCorrectingCode) -> Self {
         assert!(tanner_graph_edge_orientation(&tanner_graph));
 
         let check_node_count = tanner_graph.node_indices().filter_map(|node_idx| tanner_graph[node_idx].as_check_node()).count();
@@ -114,6 +116,14 @@ impl SmallSetFlip {
                 });
             }
         }
+    }
+}
+
+#[pymethods]
+impl SmallSetFlip {
+    #[new]
+    pub fn pynew(code : &ErrorCorrectingCode) -> PyResult<Self> {
+        Ok(Self::new(code))
     }
 }
 

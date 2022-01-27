@@ -2,10 +2,12 @@ use petgraph::{graph::{NodeIndex, DiGraph}, EdgeDirection::*, visit::{EdgeRef, I
 use enum_as_inner::EnumAsInner;
 
 use crate::error_correcting_code::{Bitstring, tanner_graph_edge_orientation, TannerGraphNode, Decoder, ErrorCorrectingCode};
+use pyo3::{pyclass, pymethods, PyResult};
 
 /// First-min Belief Propagation from
 /// Grospellier et al., Quantum 5, 432 (2021).
 #[derive(Debug, Clone)]
+#[pyclass]
 pub struct FirstMinBeliefProp {
     tanner_graph : DiGraph<TannerGraphNode, usize>,
     check_node_count : usize,
@@ -18,7 +20,7 @@ pub struct FirstMinBeliefProp {
 }
 
 impl FirstMinBeliefProp {
-    pub fn new(ErrorCorrectingCode {tanner_graph, ..} : &ErrorCorrectingCode, error_prior : f64) -> FirstMinBeliefProp {
+    pub fn new(ErrorCorrectingCode {tanner_graph, ..} : &ErrorCorrectingCode, error_prior : f64) -> Self {
         assert!(tanner_graph_edge_orientation(&tanner_graph));
 
         let check_node_count = tanner_graph.node_indices().filter_map(|node_idx| tanner_graph[node_idx].as_check_node()).count();
@@ -48,9 +50,7 @@ impl FirstMinBeliefProp {
             syndrome_diff,
         }
     }
-}
 
-impl FirstMinBeliefProp {
     /// Bits to checks belief propagation step
     fn update_bit_to_checks_messages(self : &mut Self) {
         for update_edge_idx in self.tanner_graph.edge_indices() {
@@ -134,6 +134,14 @@ impl FirstMinBeliefProp {
                 syndrome[i] ^= true;
             }
         }
+    }
+}
+
+#[pymethods]
+impl FirstMinBeliefProp {
+    #[new]
+    pub fn pynew(code : &ErrorCorrectingCode, error_prior : f64) -> PyResult<Self> {
+        Ok(Self::new(code, error_prior))
     }
 }
 

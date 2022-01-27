@@ -19,5 +19,5 @@ enum-as-inner = "0.3.3"
 rand = "0.8.3"
 rand_chacha = "0.3.1"
 rand_distr = "0.4.0"
-pyo3 = { version = "0.15", features = ["extension-module"] }
-numpy = "0.15"
+pyo3 = { version = "0.15.1", features = ["extension-module"] }
+numpy = "0.15.1"

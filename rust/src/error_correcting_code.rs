@@ -87,7 +87,10 @@ impl ErrorCorrectingCode {
         Ok(PyArray1::from_iter(py, self.logicals.iter().map(|x| x.iter()
             .map(|i| *measurement_outcomes.readonly().get(*i).unwrap()).fold(false, |a,b| a^b))))
     }
+
 }
+
+// ApplyDecoder(ErrorCorrectingCode, Decoder)
 
 /// Returns true if edges are directed from checks to bits
 pub fn tanner_graph_edge_orientation(tanner_graph : &TannerGraph) -> bool {

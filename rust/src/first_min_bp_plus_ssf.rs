@@ -2,20 +2,35 @@ use crate::error_correcting_code::{Decoder, ErrorCorrectingCode, Bitstring};
 use crate::first_min_belief_prop::FirstMinBeliefProp;
 use crate::small_set_flip::SmallSetFlip;
 
+use pyo3::exceptions::PyRuntimeError;
+use pyo3::{pyclass, pymethods, PyResult};
+
 /// First-min Belief Propagation + Small Set Flipfrom
 /// Grospellier et al., Quantum 5, 432 (2021).
 #[derive(Debug, Clone)]
-struct FirstMinBPplusSSF {
+#[pyclass]
+pub struct FirstMinBPplusSSF {
     belief_prop : FirstMinBeliefProp,
     small_set_flip : SmallSetFlip,
 }
 
 impl FirstMinBPplusSSF {
-    pub fn new(code : &ErrorCorrectingCode, error_prior : f64) -> FirstMinBPplusSSF {
+    pub fn new(code : &ErrorCorrectingCode, error_prior : f64) -> Self {
         FirstMinBPplusSSF {
             belief_prop:FirstMinBeliefProp::new(code, error_prior),
             small_set_flip:SmallSetFlip::new(code),
         }
+    }
+}
+
+#[pymethods]
+impl FirstMinBPplusSSF {
+    #[new]
+    pub fn pynew(code : &ErrorCorrectingCode, error_prior : f64) -> PyResult<Self> {
+        Ok(FirstMinBPplusSSF {
+            belief_prop:FirstMinBeliefProp::new(code, error_prior),
+            small_set_flip:SmallSetFlip::new(code),
+        })
     }
 }
 
