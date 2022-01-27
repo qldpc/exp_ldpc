@@ -1,7 +1,7 @@
 use petgraph::{graph::{NodeIndex, DiGraph}, EdgeDirection::*, visit::{EdgeRef, IntoEdgesDirected, IntoNeighbors}};
 use enum_as_inner::EnumAsInner;
 
-use crate::error_correcting_code::{TannerGraph, tanner_graph_edge_orientation, TannerGraphNode, Decoder, ErrorCorrectingCode};
+use crate::error_correcting_code::{Bitstring, tanner_graph_edge_orientation, TannerGraphNode, Decoder, ErrorCorrectingCode};
 
 /// First-min Belief Propagation from
 /// Grospellier et al., Quantum 5, 432 (2021).
@@ -13,8 +13,8 @@ pub struct FirstMinBeliefProp {
     bit_to_check_message : Vec<f64>,
     check_to_bit_message : Vec<f64>,
     prior_log_likelihood : f64,
-    correction_diff : Vec<bool>,
-    syndrome_diff : Vec<bool>,
+    correction_diff : Bitstring,
+    syndrome_diff : Bitstring,
 }
 
 impl FirstMinBeliefProp {
@@ -48,7 +48,9 @@ impl FirstMinBeliefProp {
             syndrome_diff,
         }
     }
+}
 
+impl FirstMinBeliefProp {
     /// Bits to checks belief propagation step
     fn update_bit_to_checks_messages(self : &mut Self) {
         for update_edge_idx in self.tanner_graph.edge_indices() {
@@ -65,7 +67,7 @@ impl FirstMinBeliefProp {
     }
 
     /// Checks to bits belief propagation step
-    fn update_check_to_bits_messages(self : &mut Self, syndrome : &Vec<bool>) {
+    fn update_check_to_bits_messages(self : &mut Self, syndrome : &Bitstring) {
         for update_edge_idx in self.tanner_graph.edge_indices() {
             let (check_node_idx, bit_node_idx) = self.tanner_graph.edge_endpoints(update_edge_idx).unwrap();
             
@@ -84,13 +86,13 @@ impl FirstMinBeliefProp {
     }
 
     /// Propagate the beliefs
-    fn sum_product_step(self : &mut Self, syndrome : &Vec<bool>) {
+    fn sum_product_step(self : &mut Self, syndrome : &Bitstring) {
         self.update_check_to_bits_messages(syndrome);
         self.update_bit_to_checks_messages();
     }
 
     /// Compute the change in syndrome and correction vectors from the last round
-    fn update_diffs(self : &mut Self, correction : &Vec<bool>) {
+    fn update_diffs(self : &mut Self, correction : &Bitstring) {
         // Init diffs
         self.syndrome_diff.fill(false);
         self.correction_diff.fill(false);
@@ -121,7 +123,7 @@ impl FirstMinBeliefProp {
     }
 
     /// Apply the syndrome and correction differences to a given syndrome and correction vector
-    fn apply_diffs(self : &Self, syndrome : &mut Vec<bool> , correction : &mut Vec<bool>) {
+    fn apply_diffs(self : &Self, syndrome : &mut Bitstring , correction : &mut Bitstring) {
         for i in 0..correction.len() {
             if self.correction_diff[i] {
                 correction[i] ^= true;
@@ -136,7 +138,7 @@ impl FirstMinBeliefProp {
 }
 
 impl Decoder for FirstMinBeliefProp {
-    fn correct_syndrome(self : &mut Self, syndrome : &mut Vec<bool>, correction : &mut Vec<bool>) {
+    fn correct_syndrome(self : &mut Self, syndrome : &mut Bitstring, correction : &mut Bitstring) {
         assert!(syndrome.len() == self.check_node_count);
         
         // Initialize correction vector

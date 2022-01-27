@@ -1,4 +1,4 @@
-use crate::error_correcting_code::{Decoder, ErrorCorrectingCode};
+use crate::error_correcting_code::{Decoder, ErrorCorrectingCode, Bitstring};
 use crate::first_min_belief_prop::FirstMinBeliefProp;
 use crate::small_set_flip::SmallSetFlip;
 
@@ -20,7 +20,7 @@ impl FirstMinBPplusSSF {
 }
 
 impl Decoder for FirstMinBPplusSSF {
-    fn correct_syndrome(self : &mut Self, syndrome : &mut Vec<bool>, correction : &mut Vec<bool>) {
+    fn correct_syndrome(&mut self, syndrome : &mut Bitstring, correction : &mut Bitstring) {
         // Apply BP then SSF
         // The syndrome value is required to be consistent with the input syndrome and output correction so we can compose
         self.belief_prop.correct_syndrome(syndrome, correction);

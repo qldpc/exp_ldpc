@@ -3,7 +3,7 @@ use std::collections::BinaryHeap;
 use std::cmp::Ordering;
 use enum_as_inner::EnumAsInner;
 
-use crate::error_correcting_code::{TannerGraph, tanner_graph_edge_orientation, TannerGraphNode, Decoder, ErrorCorrectingCode};
+use crate::error_correcting_code::{Bitstring, tanner_graph_edge_orientation, TannerGraphNode, Decoder, ErrorCorrectingCode};
 
 #[derive(Debug, Clone)]
 struct CheckNode {
@@ -71,13 +71,13 @@ impl SmallSetFlip {
     }
 
     /// Returns the signed size of the flip set (Net number of data nodes flipped from non-trivial to trivial)
-    fn check_flip_set_size(self : &Self, bit_node_idx : NodeIndex, syndrome : &Vec<bool>) -> i32 {
+    fn check_flip_set_size(self : &Self, bit_node_idx : NodeIndex, syndrome : &Bitstring) -> i32 {
         self.tanner_graph.neighbors_undirected(bit_node_idx).map(|neighbor_idx| 
                 if syndrome[self.tanner_graph[neighbor_idx].as_check_node().unwrap().idx] { -1 } else { 1 }).sum()
     }
 
     /// Subroutine to update the flip set sizes when decoding
-    fn update_flip_set_sizes(self : &mut Self, node_idx : NodeIndex, syndrome : &Vec<bool>) {
+    fn update_flip_set_sizes(self : &mut Self, node_idx : NodeIndex, syndrome : &Bitstring) {
         // TODO: we can remove one layer of pointer chasing with an updatable priority queue
         // Walk neighbors
         let mut neighbor_walker = self.tanner_graph.neighbors_undirected(node_idx).detach();
@@ -101,7 +101,7 @@ impl SmallSetFlip {
     }
 
     /// Initialize flip set size heap
-    fn init_flip_set_size_heap(self : &mut Self, syndrome : &Vec<bool>) {
+    fn init_flip_set_size_heap(self : &mut Self, syndrome : &Bitstring) {
         self.flip_set_size_heap.clear();
         for node_idx in self.tanner_graph.node_indices() {
             if let SsfTannerGraphNode::BitNode(BitNode {idx, flip_set_size:_}) = self.tanner_graph[node_idx] {
@@ -118,7 +118,7 @@ impl SmallSetFlip {
 }
 
 impl Decoder for SmallSetFlip { 
-    fn correct_syndrome(self : &mut Self, syndrome : &mut Vec<bool>, correction : &mut Vec<bool>) {
+    fn correct_syndrome(self : &mut Self, syndrome : &mut Bitstring, correction : &mut Bitstring) {
         assert!(syndrome.len() == self.check_node_count);
         
         // Initialize correction vector and flip set size heap

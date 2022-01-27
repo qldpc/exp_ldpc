@@ -22,11 +22,13 @@ pub struct ErrorCorrectingCode {
     pub num_qubits : usize,
 }
 
+pub type Bitstring = Vec<bool>;
+
 pub trait Decoder {
     /// A syndrome bit is true if it is non-trivial
     /// A correction bit is true if it supports a non-trivial correction
     /// The syndrome vector will contain the resulting syndrome after the recovery operator in correction is applied
-    fn correct_syndrome(self : &mut Self, syndrome : &mut Vec<bool>, correction : &mut Vec<bool>);
+    fn correct_syndrome(self : &mut Self, syndrome : &mut Bitstring, correction : &mut Bitstring);
 }
 
 #[pymethods]
