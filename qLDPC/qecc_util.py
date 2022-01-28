@@ -1,7 +1,9 @@
 from typing import Iterable, Tuple
 from scipy import sparse
 import numpy as np
+from galois import GF
 
+GF2 = GF(2)
 
 QuantumCodeChecks = Tuple[sparse.spmatrix, sparse.spmatrix, int]
 QuantumCodeLogicals = QuantumCodeChecks
