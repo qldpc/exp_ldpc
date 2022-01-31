@@ -10,7 +10,7 @@ mod first_min_bp_plus_ssf;
 mod error_correcting_code;
 
 #[pymodule]
-fn expldpc(_py: Python, m: &PyModule) -> PyResult<()> {
+fn qLDPC(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<ErrorCorrectingCode>()?;
     m.add_class::<FirstMinBeliefProp>()?;
     m.add_class::<SmallSetFlip>()?;
