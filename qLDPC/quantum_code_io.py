@@ -71,7 +71,7 @@ def test_check_io():
     from .code_examples import d3_rotated_surface_code, random_test_hpg
     from io import StringIO
 
-    for checks in [d3_rotated_surface_code(), random_test_hpg()]:
+    for checks in [d3_rotated_surface_code(), random_test_hpg()[0]]:
         # Write the code out
         test_buffer = StringIO()
         write_check_generators(test_buffer, checks)
