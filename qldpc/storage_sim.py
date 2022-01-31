@@ -1,4 +1,3 @@
-import stim
 import networkx as nx
 from networkx.algorithms import bipartite
 import scipy.sparse as sparse
