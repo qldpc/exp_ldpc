@@ -4,6 +4,7 @@ import scipy.sparse as sparse
 from typing import Callable, Iterable, Tuple, Dict, List
 from .edge_coloring import edge_color_bipartite
 from .qecc_util import num_rows, QuantumCodeChecks, QuantumCodeLogicals
+import re
 
 MeasurementOrder = Tuple[int, Dict[int, int]]
 
@@ -25,11 +26,15 @@ def order_measurements(checks : QuantumCodeChecks) -> Tuple[int, MeasurementOrde
                 assert edge[0] in check_nodes
                 target_round[edge[0]] = edge[1] - data_node_offset
             meas_order.append(target_round)
-        return (len(check_nodes), meas_order)
-    
-    return (len(data_nodes), build_meas_order_basis(checks[0]), build_meas_order_basis(checks[1]))
+        return (len(data_nodes), len(check_nodes), meas_order)
 
-def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[int, int, int, Tuple[List[int], List[int], List[int]], List[str]]:
+
+    (x_data_nodes, x_check_nodes, xorder) = build_meas_order_basis(checks[0])
+    (z_data_nodes, z_check_nodes, zorder) = build_meas_order_basis(checks[1])
+    assert x_data_nodes == z_data_nodes
+    return (x_data_nodes, (x_check_nodes, xorder), (z_check_nodes, zorder) )
+
+def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[List[int], List[int], List[int], List[str]]:
     '''Syndrome extraction circuit to measure X checks then Z checks'''
     (num_data_qubits, (x_check_count, x_check_schedule), (z_check_count, z_check_schedule)) = order_measurements(checks)
 
@@ -63,38 +68,46 @@ def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[int, int, int, Tu
     # Leave off the final tick so we can interleave this element
     # circuit.append('TICK')  # --------
 
-    return (num_data_qubits, x_check_count, z_check_count, (list(range(num_data_qubits)), x_check_ancillas, z_check_ancillas), circuit)
+    return (list(range(num_data_qubits)), x_check_ancillas, z_check_ancillas, circuit)
+
+measurement_gates = ['M', 'MZ', 'MX', 'MY', 'MPP', 'MR', 'MRZ', 'MRX', 'MRY']
+measurement_line_pattern = re.compile(f'^(?:\s*)({"|".join(measurement_gates)})((?:\s*\d+\s*)+)$')
 
 def rewrite_measurement_noise(p : float, circuit_line : str) -> str:
-    measurement_gates = ['M', 'MZ', 'MX', 'MY', 'MPP', 'MR', 'MRZ', 'MRX', 'MRY']
-    (left_partition, measurement, right_partition) = circuit_line.partition(measurement_gates)
-    assert(left_partition.isspace or len(left_partition) == 0)
-    return f'{measurement}({p}){right_partition}'
+    search_result = measurement_line_pattern.search(circuit_line)
+    if search_result is None:
+        return circuit_line
+    else:
+        (meas_type, targets) = search_result.group(1,2)
+        return f'{meas_type}({p}){targets}'
 
 def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterable[int], ancilla_qubit_indices : Iterable[int], circuit : Iterable[str]) -> List[str]:
     noisy_circuit = [rewrite_measurement_noise(pm, line) for line in circuit]
-    noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(data_qubit_indices)}')
-    noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(ancilla_qubit_indices)}')
+    noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(str(i) for i in data_qubit_indices)}')
+    noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(str(i) for i in ancilla_qubit_indices)}')
     return noisy_circuit
 
 
 # TODO: We will rewrite the perfect circuit to insert the appropriate fault locations noise model
-def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], logicals : QuantumCodeLogicals, checks : QuantumCodeChecks, use_x_logicals = None) -> Tuple[str, Callable[[int, bool, list], list], Callable[[list], list]]:
+def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], checks : QuantumCodeChecks, use_x_logicals = None) -> Tuple[str, Callable[[int, bool, list], list], Callable[[list], list]]:
     if use_x_logicals is None:
         use_x_logicals = False
 
     reset_meas_basis = 'X' if use_x_logicals else 'Z'
 
-    (num_data_qubits, x_check_count, z_check_count, syndrome_extraction_circuit) = build_perfect_circuit(checks)
+    (data_qubit_indices, x_check_indices, z_check_indices, syndrome_extraction_circuit) = build_perfect_circuit(checks)
+
+    x_check_count = len(x_check_indices)
+    z_check_count = len(z_check_indices)
 
     circuit = []
     # Prepare logical zero
     # We could optimize this by directly measuring the checks but it's a small cost
-    circuit.append(f'R{reset_meas_basis} {" ".join(range(num_data_qubits))}')
+    circuit.append(f'R{reset_meas_basis} {" ".join(str(i) for i in data_qubit_indices)}')
     circuit.extend(syndrome_extraction_circuit)
 
     # Do noisy QEC
-    noisy_syndrome_extraction_circuit = noise_model(syndrome_extraction_circuit)
+    noisy_syndrome_extraction_circuit = noise_model(data_qubit_indices, x_check_indices+z_check_indices, syndrome_extraction_circuit)
     for _ in range(rounds):
         circuit.extend(noisy_syndrome_extraction_circuit)
     
@@ -102,16 +115,16 @@ def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], l
     circuit.extend(syndrome_extraction_circuit)
 
     # Read out data qubits
-    circuit.append(f'M{reset_meas_basis} {" ".join(range(num_data_qubits))}')
+    circuit.append(f'M{reset_meas_basis} {" ".join(str(i) for i in data_qubit_indices)}')
 
-    def meas_result(round_index, get_x_checks, measurement_vector):
+    def meas_result(round_index, get_x_checks, measurement_vector, *_, x_check_count=x_check_count, z_check_count=z_check_count):
         meas_round_offset = (x_check_count + z_check_count) * round_index
         check_offset = meas_round_offset + (0 if get_x_checks else x_check_count)
         check_count = x_check_count if get_x_checks  else z_check_count
 
         return measurement_vector[check_offset : check_offset + check_count]
 
-    def data_result(measurement_vector):
+    def data_result(measurement_vector, *_, x_check_count=x_check_count, z_check_count=z_check_count, rounds=rounds, num_data_qubits = len(data_qubit_indices)):
         offset = (x_check_count + z_check_count)*rounds
         return measurement_vector[offset : offset*num_data_qubits]
 
