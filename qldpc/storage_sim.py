@@ -1,3 +1,4 @@
+from multiprocessing.sharedctypes import Value
 import networkx as nx
 from networkx.algorithms import bipartite
 import scipy.sparse as sparse
@@ -5,6 +6,7 @@ from typing import Callable, Iterable, Tuple, Dict, List
 from .edge_coloring import edge_color_bipartite
 from .qecc_util import num_rows, QuantumCodeChecks, QuantumCodeLogicals
 import re
+import numpy as np
 
 MeasurementOrder = Tuple[int, Dict[int, int]]
 
@@ -38,10 +40,10 @@ def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[List[int], List[i
     '''Syndrome extraction circuit to measure X checks then Z checks'''
     (num_data_qubits, (x_check_count, x_check_schedule), (z_check_count, z_check_schedule)) = order_measurements(checks)
 
-    x_check_ancillas = list(range(num_data_qubits, num_data_qubits+x_check_count))
+    x_check_ancillas = np.array(list(range(num_data_qubits, num_data_qubits+x_check_count)))
     x_check_ancilla_str = ' '.join(str(v) for v in x_check_ancillas)
 
-    z_check_ancillas = list(range(num_data_qubits+x_check_count, num_data_qubits+x_check_count+z_check_count))
+    z_check_ancillas = np.array(list(range(num_data_qubits+x_check_count, num_data_qubits+x_check_count+z_check_count)))
     z_check_ancilla_str = ' '.join(str(v) for v in z_check_ancillas)
     
     circuit = []
@@ -50,7 +52,7 @@ def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[List[int], List[i
     circuit.append('TICK') # --------
     # X check circuit
     for round in x_check_schedule:
-        circuit.extend(f'CX {check} {target}' for (check, target) in round.items())
+        circuit.extend(f'CX {x_check_ancillas[check]} {target}' for (check, target) in round.items())
         circuit.append('TICK') # --------
     # Measure
     circuit.append(f'MX {x_check_ancilla_str}')
@@ -60,14 +62,13 @@ def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[List[int], List[i
     circuit.append('TICK') # --------
 
     for round in z_check_schedule:
-        circuit.extend(f'CZ {check} {target}' for (check, target) in round.items())
+        circuit.extend(f'CZ {z_check_ancillas[check]} {target}' for (check, target) in round.items())
         circuit.append('TICK') # --------
 
     circuit.append(f'MX {z_check_ancilla_str}')
 
     # Leave off the final tick so we can interleave this element
     # circuit.append('TICK')  # --------
-
     return (list(range(num_data_qubits)), x_check_ancillas, z_check_ancillas, circuit)
 
 measurement_gates = ['M', 'MZ', 'MX', 'MY', 'MPP', 'MR', 'MRZ', 'MRX', 'MRY']
@@ -87,6 +88,21 @@ def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterabl
     noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(str(i) for i in ancilla_qubit_indices)}')
     return noisy_circuit
 
+def unique_targets(circuit : str):
+    '''Ensure that a qubit only appears once per timestep'''
+    def try_int(x):
+        try:
+            return int(x)
+        except ValueError:
+            return None
+
+    def unique_targets_timestep(step : str):
+        targets = [x for x in map(try_int, step.split()) if x is not None]
+        unique_targets = frozenset(targets)
+        assert len(targets) == len(unique_targets)
+
+    for timestep, timestep_circuit in enumerate(circuit.split('TICK')):
+        unique_targets_timestep(timestep_circuit)
 
 # TODO: We will rewrite the perfect circuit to insert the appropriate fault locations noise model
 def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], checks : QuantumCodeChecks, use_x_logicals = None) -> Tuple[str, Callable[[int, bool, list], list], Callable[[list], list]]:
@@ -128,5 +144,6 @@ def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], c
         offset = (x_check_count + z_check_count)*rounds
         return measurement_vector[offset : offset*num_data_qubits]
 
+    unique_targets('\n'.join(circuit))
     return (circuit, meas_result, data_result)
 
