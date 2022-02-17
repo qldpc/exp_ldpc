@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use enum_as_inner::EnumAsInner;
 use pyo3::{pyclass, pymethods, PyResult};
 
-use crate::error_correcting_code::{Bitstring, tanner_graph_edge_orientation, TannerGraphNode, Decoder, ErrorCorrectingCode};
+use crate::error_correcting_code::{Bitstring, tanner_graph_edge_orientation, TannerGraphNode, Decoder, DecoderWrapper, ErrorCorrectingCode};
 
 #[derive(Debug, Clone)]
 struct CheckNode {
@@ -121,9 +121,10 @@ impl SmallSetFlip {
 
 #[pymethods]
 impl SmallSetFlip {
-    #[new]
-    pub fn pynew(code : &ErrorCorrectingCode) -> PyResult<Self> {
-        Ok(Self::new(code))
+    #[staticmethod]
+    pub fn wrapped_new(code : &ErrorCorrectingCode) -> PyResult<DecoderWrapper> {
+        let decoder = Box::new(Self::new(code));
+        Ok(DecoderWrapper{decoder})
     }
 }
 

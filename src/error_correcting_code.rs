@@ -19,6 +19,7 @@ pub enum TannerGraphNode {
 pub struct ErrorCorrectingCode {
     pub tanner_graph : TannerGraph,
     pub logicals : Vec<Vec<usize>>,
+    pub checks : Vec<Vec<usize>>,
     pub num_qubits : usize,
 }
 
@@ -29,6 +30,11 @@ pub trait Decoder {
     /// A correction bit is true if it supports a non-trivial correction
     /// The syndrome vector will contain the resulting syndrome after the recovery operator in correction is applied
     fn correct_syndrome(self : &mut Self, syndrome : &mut Bitstring, correction : &mut Bitstring);
+}
+
+#[pyclass]
+pub struct DecoderWrapper {
+    pub decoder : Box<dyn Decoder + Send>
 }
 
 #[pymethods]
@@ -65,7 +71,7 @@ impl ErrorCorrectingCode {
             }
         }
 
-        Ok(ErrorCorrectingCode {tanner_graph, logicals, num_qubits})
+        Ok(ErrorCorrectingCode {tanner_graph, logicals, num_qubits, checks})
     }
 
     pub fn apply_correction(&self, _py: Python<'_>, correction : &PyArray1<bool>, measurement_outcomes : &PyArray1<bool>) -> PyResult<()> {
@@ -79,6 +85,12 @@ impl ErrorCorrectingCode {
         }
     }
 
+    /// Compute the syndrome from reading out the data qubits
+    pub fn compute_syndrome<'pyl>(&self, py: Python<'pyl>, measurement_outcomes : &PyArray1<bool>) -> PyResult<&'pyl PyArray1<bool>> {
+        Ok(PyArray1::from_iter(py, self.checks.iter().map(|x| x.iter()
+            .map(|i| *measurement_outcomes.readonly().get(*i).unwrap()).fold(false, |a,b| a^b))))
+    }
+
     pub fn measure_logicals<'pyl>(&self, py: Python<'pyl>, measurement_outcomes : &PyArray1<bool>) -> PyResult<&'pyl PyArray1<bool>> {
         if measurement_outcomes.shape()[0] != self.num_qubits { 
             Err(PyErr::new::<PyRuntimeError, _>("Measurement number does not match number of qubits")) } else { Ok(()) }?;
@@ -89,12 +101,17 @@ impl ErrorCorrectingCode {
     }
 
     /// Compute the spacetime syndrome by pairwise adding syndrome outcomes in time
-    pub fn spacetime_syndrome<'pyl>(&self, py: Python<'pyl>, measurement_outcomes : &PyArray1<bool>) -> PyResult<&'pyl PyArray1<bool>> {
+    pub fn spacetime_syndrome<'pyl>(&self, _py: Python<'pyl>, _measurement_outcomes : &PyArray1<bool>) -> PyResult<&'pyl PyArray1<bool>> {
         panic!()
     }
-}
 
-// ApplyDecoder(ErrorCorrectingCode, Decoder)
+    pub fn apply_decoder<'pyl>(&self, py: Python<'pyl>, decoder : &mut DecoderWrapper, syndrome : &PyArray1<bool>) -> PyResult<&'pyl PyArray1<bool>> {
+        let mut correction = Vec::new();
+        let mut syndrome = syndrome.to_vec()?;
+        decoder.decoder.correct_syndrome(&mut syndrome, &mut correction);
+        Ok(PyArray1::from_vec(py, correction))
+    }
+}
 
 /// Returns true if edges are directed from checks to bits
 pub fn tanner_graph_edge_orientation(tanner_graph : &TannerGraph) -> bool {
@@ -104,6 +121,7 @@ pub fn tanner_graph_edge_orientation(tanner_graph : &TannerGraph) -> bool {
     )
 }
 
-pub fn spacetime_code(code : &ErrorCorrectingCode, num_rounds : usize, perfect_final_round : bool) -> ErrorCorrectingCode {
+/// Return an error correcting code with checks that are local in spacetime
+pub fn spacetime_code(_code : &ErrorCorrectingCode, _num_rounds : usize, _perfect_final_round : bool) -> ErrorCorrectingCode {
     panic!()
 }

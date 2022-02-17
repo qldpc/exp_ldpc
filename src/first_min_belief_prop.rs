@@ -1,7 +1,7 @@
 use petgraph::{graph::{NodeIndex, DiGraph}, EdgeDirection::*, visit::{EdgeRef, IntoEdgesDirected, IntoNeighbors}};
 use enum_as_inner::EnumAsInner;
 
-use crate::error_correcting_code::{Bitstring, tanner_graph_edge_orientation, TannerGraphNode, Decoder, ErrorCorrectingCode};
+use crate::error_correcting_code::{Bitstring, tanner_graph_edge_orientation, TannerGraphNode, Decoder, DecoderWrapper, ErrorCorrectingCode};
 use pyo3::{pyclass, pymethods, PyResult};
 
 /// First-min Belief Propagation from
@@ -139,9 +139,10 @@ impl FirstMinBeliefProp {
 
 #[pymethods]
 impl FirstMinBeliefProp {
-    #[new]
-    pub fn pynew(code : &ErrorCorrectingCode, error_prior : f64) -> PyResult<Self> {
-        Ok(Self::new(code, error_prior))
+    #[staticmethod]
+    pub fn wrapped_new(code : &ErrorCorrectingCode, error_prior : f64) -> PyResult<DecoderWrapper> {
+        let decoder = Box::new(Self::new(code, error_prior));
+        Ok(DecoderWrapper{decoder})
     }
 }
 

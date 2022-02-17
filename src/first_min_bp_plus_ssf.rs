@@ -1,4 +1,4 @@
-use crate::error_correcting_code::{Decoder, ErrorCorrectingCode, Bitstring};
+use crate::error_correcting_code::{Decoder, DecoderWrapper, ErrorCorrectingCode, Bitstring};
 use crate::first_min_belief_prop::FirstMinBeliefProp;
 use crate::small_set_flip::SmallSetFlip;
 
@@ -25,12 +25,13 @@ impl FirstMinBPplusSSF {
 
 #[pymethods]
 impl FirstMinBPplusSSF {
-    #[new]
-    pub fn pynew(code : &ErrorCorrectingCode, error_prior : f64) -> PyResult<Self> {
-        Ok(FirstMinBPplusSSF {
+    #[staticmethod]
+    pub fn wrapped_new(code : &ErrorCorrectingCode, error_prior : f64) -> PyResult<DecoderWrapper> {
+        let decoder = Box::new(FirstMinBPplusSSF {
             belief_prop:FirstMinBeliefProp::new(code, error_prior),
             small_set_flip:SmallSetFlip::new(code),
-        })
+        });
+        Ok(DecoderWrapper{decoder})
     }
 }
 
