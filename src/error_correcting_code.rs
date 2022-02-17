@@ -88,6 +88,10 @@ impl ErrorCorrectingCode {
             .map(|i| *measurement_outcomes.readonly().get(*i).unwrap()).fold(false, |a,b| a^b))))
     }
 
+    /// Compute the spacetime syndrome by pairwise adding syndrome outcomes in time
+    pub fn spacetime_syndrome<'pyl>(&self, py: Python<'pyl>, measurement_outcomes : &PyArray1<bool>) -> PyResult<&'pyl PyArray1<bool>> {
+        panic!()
+    }
 }
 
 // ApplyDecoder(ErrorCorrectingCode, Decoder)
@@ -98,4 +102,8 @@ pub fn tanner_graph_edge_orientation(tanner_graph : &TannerGraph) -> bool {
            tanner_graph[edge_ref.source()].as_check_node().is_some()
         && tanner_graph[edge_ref.target()].as_bit_node().is_some()
     )
+}
+
+pub fn spacetime_code(code : &ErrorCorrectingCode, num_rounds : usize, perfect_final_round : bool) -> ErrorCorrectingCode {
+    panic!()
 }
