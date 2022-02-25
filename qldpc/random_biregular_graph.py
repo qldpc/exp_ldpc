@@ -1,6 +1,10 @@
 import networkx as nx
 import numpy as np
 import itertools
+from typing import Tuple
+
+def canonicalize_edge(x : Tuple[int, int]) -> Tuple[int, int]:
+    return (x[0], x[1]) if x[0] < x[1] else (x[1], x[0])
 
 def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, check_degree : int, seed=None, graph_multiedge_retries=None):
     if graph_multiedge_retries is None:
@@ -39,14 +43,13 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
                 if num_edges > 1:
                     multiedge_list.extend(itertools.repeat((node, neighbor_node), num_edges-1))
     
-        print(len(multiedge_list))
         if len(multiedge_list) == 0:
             break
         
         # ---------------
 
-        edge_removal_list = []
-        edge_add_list = []
+        edge_removal_list = set()
+        edge_add_list = set()
 
         # Compute update
         edge_list = list(tanner_graph.edges())
@@ -55,11 +58,14 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
             new_edge_a = (edge_a[0], edge_b[1])
             new_edge_b = (edge_b[0], edge_a[1])
 
-            edge_removal_list.append(edge_a)
-            edge_removal_list.append(edge_b)
+            # We can end up selecting an edge that's already in the multiedge_list
+            if canonicalize_edge(edge_b) not in edge_removal_list:
 
-            edge_add_list.append(new_edge_a)
-            edge_add_list.append(new_edge_b)
+                edge_removal_list.add(canonicalize_edge(edge_a))
+                edge_removal_list.add(canonicalize_edge(edge_b))
+
+                edge_add_list.add(canonicalize_edge(new_edge_a))
+                edge_add_list.add(canonicalize_edge(new_edge_b))
         
         # Apply update
         for e in edge_removal_list:
