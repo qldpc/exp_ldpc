@@ -42,15 +42,7 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
         gen_A = get_generator_matrix(GF2(partial_A_dense))
         gen_B = get_generator_matrix(GF2(partial_B_dense))
 
-        # Zero vectors restricted to the A_1 x B_0 and A_0 x B_1 subspaces
-        A1B0_zero = np.zeros((1, partial_A_dense.shape[1] * partial_B_dense.shape[0]))
-        A0B1_zero = np.zeros((1, partial_A_dense.shape[0] * partial_B_dense.shape[1]))
-
-        A1B0_logicals = [np.hstack([A0B1_zero, np.kron(gen_A[i, :], partial_B_dense[j, :])]) for i in range(gen_A.shape[0]) for j in range(partial_B_dense.shape[0])]
-        A0B1_logicals = [np.hstack([np.kron(partial_A_dense[i, :], gen_B[j, :]), A1B0_zero]) for i in range(partial_A_dense.shape[0]) for j in range(gen_B.shape[0])]
-
-        x_logicals.extend(A1B0_logicals)
-        x_logicals.extend(A0B1_logicals)
+        x_logicals = [np.hstack([np.kron(gen_A[i, :], partial_B_dense[0, :]), np.kron(partial_A_dense[0, :], gen_B[j, :])]) for i in range(gen_A.shape[0]) for j in range(gen_B.shape[0])]
 
         # Logicals for the dual
 
@@ -60,14 +52,8 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
         gen_A_dual = get_generator_matrix(GF2(partial_A_dense.transpose()))
         gen_B_dual = get_generator_matrix(GF2(partial_B_dense.transpose()))
 
-        A1B0_dual_zero = np.zeros((1, partial_A_dual_dense.shape[1] * partial_B_dual_dense.shape[0]))
-        A0B1_dual_zero = np.zeros((1, partial_A_dual_dense.shape[0] * partial_B_dual_dense.shape[1]))
-
-        A1B0_dual_logicals = [np.hstack([A1B0_dual_zero, np.kron(gen_A_dual[i, :], partial_B_dual_dense[j, :])]) for i in range(gen_A_dual.shape[0]) for j in range(partial_B_dual_dense.shape[0])]
-        A0B1_dual_logicals = [np.hstack([np.kron(partial_A_dual_dense[i, :], gen_B_dual[j, :]), A1B0_dual_zero]) for i in range(partial_A_dual_dense.shape[0]) for j in range(gen_B_dual.shape[0])]
+        z_logicals = [np.hstack([np.kron(gen_A_dual[i, :], partial_B_dual_dense[0, :]), np.kron(partial_A_dual_dense[0, :], gen_B_dual[j, :])]) for i in range(gen_A_dual.shape[0]) for j in range(gen_B_dual.shape[0])]
         
-        z_logicals.extend(A1B0_dual_logicals)
-        z_logicals.extend(A0B1_dual_logicals)
 
     logicals = (x_logicals, z_logicals, len(x_logicals))
 
