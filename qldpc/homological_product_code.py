@@ -42,19 +42,21 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
         gen_A = get_generator_matrix(GF2(partial_A_dense))
         gen_B = get_generator_matrix(GF2(partial_B_dense))
 
-        x_logicals = [np.hstack([np.kron(gen_A[i, :], partial_B_dense[0, :]), np.kron(partial_A_dense[0, :], gen_B[j, :])]) for i in range(gen_A.shape[0]) for j in range(gen_B.shape[0])]
-
-        # Logicals for the dual
-
         partial_A_dual_dense = partial_A_dense.transpose()
         partial_B_dual_dense = partial_B_dense.transpose()
 
+        # Rows of the generator for the transpose code are a basis for the orthogonal complement of the image of the check matrix 
         gen_A_dual = get_generator_matrix(GF2(partial_A_dense.transpose()))
         gen_B_dual = get_generator_matrix(GF2(partial_B_dense.transpose()))
 
-        z_logicals = [np.hstack([np.kron(gen_A_dual[i, :], partial_B_dual_dense[0, :]), np.kron(partial_A_dual_dense[0, :], gen_B_dual[j, :])]) for i in range(gen_A_dual.shape[0]) for j in range(gen_B_dual.shape[0])]
-        
 
+        x_logicals.extend(np.hstack([np.kron(gen_A[i, :], gen_B_dual[j, :]), np.zeros(partial_A_dual_dense.shape[1]*partial_B_dense.shape[1])]) for i in range(gen_A.shape[0]) for j in range(gen_B_dual.shape[0]))
+        x_logicals.extend(np.hstack([np.zeros(gen_A.shape[1] * partial_B_dual_dense.shape[1]), np.kron(gen_A_dual[i, :], gen_B[j, :])]) for i in range(gen_A_dual.shape[0]) for j in range(gen_B.shape[0]))
+        
+        # Logicals for the dual
+        z_logicals.extend(np.hstack([np.kron(gen_A_dual[i, :], gen_B[j, :]), np.zeros(partial_A_dense.shape[1]*partial_B_dual_dense.shape[1])]) for i in range(gen_A_dual.shape[0]) for j in range(gen_B.shape[0]))
+        z_logicals.extend(np.hstack([np.zeros(gen_A_dual.shape[1] * partial_B_dense.shape[1]), np.kron(gen_A[i, :], gen_B_dual[j, :])]) for i in range(gen_A.shape[0]) for j in range(gen_B_dual.shape[0]))
+        
     logicals = (x_logicals, z_logicals, len(x_logicals))
 
     # C2 dimension
@@ -64,5 +66,7 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     assert partial_1.shape[1] == partial_2.shape[0]
     # C0 dimension
     assert partial_1.shape[0] == partial_A.shape[0]*partial_B.shape[0]
+
+    assert(len(x_logicals) == len(z_logicals))
 
     return ((partial_2.tocsc(), partial_1.tocsr(), num_cols(partial_1)), logicals)

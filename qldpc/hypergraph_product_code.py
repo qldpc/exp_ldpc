@@ -23,6 +23,7 @@ def biregular_hpg(num_data : int, data_degree : int, check_degree : int, seed=No
 
     (x_checks, z_checks) = (partial_2.transpose().tocsr(), partial_1.tocsr())
 
+    assert len(x_logicals) == len(z_logicals)
     assert x_checks.shape == z_checks.shape # If we A (x) A instead of A (x) A* we get different shapes???
     assert num_qubits == (num_data**2 + num_checks**2)
     return ((x_checks, z_checks, num_qubits), (x_logicals, z_logicals, num_qubits))
@@ -34,10 +35,10 @@ def test_smoketest_biregular_hpg():
     ((x_checks, z_checks, _), (x_logicals, z_logicals, _)) = random_test_hpg()
 
     assert np.all((x_checks @ z_checks.transpose()).data%2 == 0)
-    for l in x_logicals:
-        assert np.all((z_checks.transpose() @ l).data%2 == 0)
     for l in z_logicals:
-        assert np.all((x_checks.transpose() @ l).data%2 == 0)
+        assert np.all((x_checks @ l)%2 == 0)
+    for l in x_logicals:
+        assert np.all((z_checks @ l)%2 == 0)
 
     print(z_checks.sum(1))
     print(x_checks.sum(1))
