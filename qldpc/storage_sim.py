@@ -141,7 +141,7 @@ def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], c
         return measurement_vector[check_offset : check_offset + check_count]
 
     def data_result(measurement_vector, *_, x_check_count=x_check_count, z_check_count=z_check_count, rounds=rounds, num_data_qubits = len(data_qubit_indices)):
-        offset = (x_check_count + z_check_count)*rounds
+        offset = (x_check_count + z_check_count)*(rounds+2)
         return measurement_vector[offset : offset*num_data_qubits]
 
     unique_targets('\n'.join(circuit))
