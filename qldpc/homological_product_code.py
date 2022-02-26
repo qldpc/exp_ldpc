@@ -49,14 +49,15 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
         gen_A_dual = get_generator_matrix(GF2(partial_A_dense.transpose()))
         gen_B_dual = get_generator_matrix(GF2(partial_B_dense.transpose()))
 
-
-        x_logicals.extend(np.hstack([np.kron(gen_A[i, :], gen_B_dual[j, :]), np.zeros(partial_A_dual_dense.shape[1]*partial_B_dense.shape[1])]) for i in range(gen_A.shape[0]) for j in range(gen_B_dual.shape[0]))
-        x_logicals.extend(np.hstack([np.zeros(gen_A.shape[1] * partial_B_dual_dense.shape[1]), np.kron(gen_A_dual[i, :], gen_B[j, :])]) for i in range(gen_A_dual.shape[0]) for j in range(gen_B.shape[0]))
-        
         # Logicals for the dual
-        z_logicals.extend(np.hstack([np.kron(gen_A_dual[i, :], gen_B[j, :]), np.zeros(partial_A_dense.shape[1]*partial_B_dual_dense.shape[1])]) for i in range(gen_A_dual.shape[0]) for j in range(gen_B.shape[0]))
-        z_logicals.extend(np.hstack([np.zeros(gen_A_dual.shape[1] * partial_B_dense.shape[1]), np.kron(gen_A[i, :], gen_B_dual[j, :])]) for i in range(gen_A.shape[0]) for j in range(gen_B_dual.shape[0]))
+        z_logicals.extend(np.hstack([np.kron(gen_A_dual[i, :], gen_B[j, :]), np.zeros(partial_A_dense.shape[1]*partial_B_dual_dense.shape[1])]).astype(np.uint8) for i in range(gen_A_dual.shape[0]) for j in range(gen_B.shape[0]))
+        z_logicals.extend(np.hstack([np.zeros(gen_A_dual.shape[1] * partial_B_dense.shape[1]), np.kron(gen_A[i, :], gen_B_dual[j, :])]).astype(np.uint8) for i in range(gen_A.shape[0]) for j in range(gen_B_dual.shape[0]))
+
+        # Don't worry about the non self-dual case for now
+        assert (partial_A != partial_B.transpose()).nnz == 0
+        x_logicals = z_logicals
         
+
     logicals = (x_logicals, z_logicals, len(x_logicals))
 
     # C2 dimension
@@ -69,4 +70,4 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
 
     assert(len(x_logicals) == len(z_logicals))
 
-    return ((partial_2.tocsc(), partial_1.tocsr(), num_cols(partial_1)), logicals)
+    return ((partial_2.tocsc().astype(np.uint8), partial_1.tocsr().astype(np.uint8), num_cols(partial_1)), logicals)
