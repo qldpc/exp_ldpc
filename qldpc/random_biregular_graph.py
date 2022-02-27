@@ -90,3 +90,6 @@ def check_biregular(G, data_degree, check_degree):
 def test_smoketest_random_biregular_graph():
     graph = random_biregular_graph(27, 36, 3, 4, seed=42)
     check_biregular(graph, 3, 4)
+    
+    graph = random_biregular_graph(10, 12, 5, 6, seed=670235982)
+    check_biregular(graph, 5, 6)
