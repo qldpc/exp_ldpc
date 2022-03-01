@@ -1,6 +1,7 @@
 import networkx as nx
 import numpy as np
 import itertools
+import pytest
 from typing import Tuple
 
 def canonicalize_edge(x : Tuple[int, int]) -> Tuple[int, int]:
@@ -87,9 +88,23 @@ def check_biregular(G, data_degree, check_degree):
         else:
             assert degree == check_degree
 
-def test_smoketest_random_biregular_graph():
-    graph = random_biregular_graph(27, 36, 3, 4, seed=42)
-    check_biregular(graph, 3, 4)
-    
-    graph = random_biregular_graph(10, 12, 5, 6, seed=670235982)
-    check_biregular(graph, 5, 6)
+
+seeds = [
+    0x59824c5a, 0x9dca707a, 0xe0218aa8, 0x81da8035, 
+    0x63b16deb, 0x7dc89245, 0x1ab46afa, 0x5cc6d93e, 
+    0x6a550348, 0x97090396, 0x2a18366d, 0xcba46c36, 
+    0xa7984b05, 0x82ee5a86, 0xb6cbf54b, 0xce8b63a4,
+    ]
+
+graph_cases = (
+    [(27, 3, 4, s) for s in seeds]
+    + [(10, 5, 6, s) for s in seeds]
+    + [(21, 7, 8, s) for s in seeds]
+    + [(27, 9, 10, s) for s in seeds]
+    )
+
+@pytest.mark.parametrize("left_vertices,right_deg,left_deg,seed", graph_cases)
+def test_smoketest_random_biregular_graph(left_vertices, right_deg, left_deg, seed):
+    right_vertices = left_vertices*left_deg//right_deg
+    graph = random_biregular_graph(left_vertices, right_vertices, right_deg, left_deg, seed=seed)
+    check_biregular(graph, right_deg, left_deg)
