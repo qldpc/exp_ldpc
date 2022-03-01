@@ -1,6 +1,7 @@
 import networkx as nx
 import numpy as np
 import itertools
+import pytest
 from typing import Tuple
 
 def canonicalize_edge(x : Tuple[int, int]) -> Tuple[int, int]:
@@ -48,8 +49,8 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
         
         # ---------------
 
-        edge_removal_list = set()
-        edge_add_list = set()
+        edge_removal_list = list()
+        edge_add_list = list()
 
         # Compute update
         edge_list = list(tanner_graph.edges())
@@ -59,19 +60,22 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
             new_edge_b = (edge_b[0], edge_a[1])
 
             # We can end up selecting an edge that's already in the multiedge_list
-            if canonicalize_edge(edge_b) not in edge_removal_list:
+            no_double_remove = canonicalize_edge(edge_b) not in edge_removal_list
+            if no_double_remove:
 
-                edge_removal_list.add(canonicalize_edge(edge_a))
-                edge_removal_list.add(canonicalize_edge(edge_b))
+                edge_removal_list.append(canonicalize_edge(edge_a))
+                edge_removal_list.append(canonicalize_edge(edge_b))
 
-                edge_add_list.add(canonicalize_edge(new_edge_a))
-                edge_add_list.add(canonicalize_edge(new_edge_b))
+                edge_add_list.append(canonicalize_edge(new_edge_a))
+                edge_add_list.append(canonicalize_edge(new_edge_b))
         
         # Apply update
         for e in edge_removal_list:
             # Removes an arbitrary edge if there are multiple edges like e
             tanner_graph.remove_edge(*e, key=None)
         tanner_graph.add_edges_from(edge_add_list)
+        
+        # check_biregular(tanner_graph, data_degree, check_degree, False)
     else:
         raise RuntimeError('Unable to remove multiedges from the graph')
 
@@ -79,7 +83,9 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
 
     return tanner_graph
         
-def check_biregular(G, data_degree, check_degree):
+def check_biregular(G, data_degree, check_degree, check_type=True):
+    if check_type is True:
+        assert type(G) is nx.Graph
     # Consistency check
     for (node, degree) in G.degree():
         if G.nodes[node]['bipartite'] == 0:
@@ -87,9 +93,23 @@ def check_biregular(G, data_degree, check_degree):
         else:
             assert degree == check_degree
 
-def test_smoketest_random_biregular_graph():
-    graph = random_biregular_graph(27, 36, 3, 4, seed=42)
-    check_biregular(graph, 3, 4)
-    
-    graph = random_biregular_graph(10, 12, 5, 6, seed=670235982)
-    check_biregular(graph, 5, 6)
+
+seeds = [
+    0x59824c5a, 0x9dca707a, 0xe0218aa8, 0x81da8035, 
+    0x63b16deb, 0x7dc89245, 0x1ab46afa, 0x5cc6d93e, 
+    0x6a550348, 0x97090396, 0x2a18366d, 0xcba46c36, 
+    0xa7984b05, 0x82ee5a86, 0xb6cbf54b, 0xce8b63a4,
+    ]
+
+graph_cases = (
+    [(27, 3, 4, s) for s in seeds]
+    + [(10, 5, 6, s) for s in seeds]
+    + [(21, 7, 8, s) for s in seeds]
+    + [(27, 9, 10, s) for s in seeds]
+    )
+
+@pytest.mark.parametrize("left_vertices,right_deg,left_deg,seed", graph_cases)
+def test_smoketest_random_biregular_graph(left_vertices, right_deg, left_deg, seed):
+    right_vertices = left_vertices*left_deg//right_deg
+    graph = random_biregular_graph(left_vertices, right_vertices, right_deg, left_deg, seed=seed)
+    check_biregular(graph, right_deg, left_deg)
