@@ -4,6 +4,8 @@ import itertools
 import pytest
 from typing import Tuple
 
+from sympy import true
+
 def canonicalize_edge(x : Tuple[int, int]) -> Tuple[int, int]:
     return (x[0], x[1]) if x[0] < x[1] else (x[1], x[0])
 
@@ -44,6 +46,7 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
                 if num_edges > 1:
                     multiedge_list.extend(itertools.repeat((node, neighbor_node), num_edges-1))
     
+        print(multiedge_list)
         if len(multiedge_list) == 0:
             break
         
@@ -68,11 +71,15 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
                 edge_add_list.add(canonicalize_edge(new_edge_a))
                 edge_add_list.add(canonicalize_edge(new_edge_b))
         
+        print(f'Remove: {edge_removal_list}')
+        print(f'Add: {edge_add_list}')
         # Apply update
         for e in edge_removal_list:
             # Removes an arbitrary edge if there are multiple edges like e
             tanner_graph.remove_edge(*e, key=None)
         tanner_graph.add_edges_from(edge_add_list)
+        
+        check_biregular(tanner_graph, data_degree, check_degree, False)
     else:
         raise RuntimeError('Unable to remove multiedges from the graph')
 
@@ -80,7 +87,9 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
 
     return tanner_graph
         
-def check_biregular(G, data_degree, check_degree):
+def check_biregular(G, data_degree, check_degree, check_type=True):
+    if check_type is True:
+        assert type(G) is nx.Graph
     # Consistency check
     for (node, degree) in G.degree():
         if G.nodes[node]['bipartite'] == 0:
@@ -96,12 +105,13 @@ seeds = [
     0xa7984b05, 0x82ee5a86, 0xb6cbf54b, 0xce8b63a4,
     ]
 
-graph_cases = (
-    [(27, 3, 4, s) for s in seeds]
-    + [(10, 5, 6, s) for s in seeds]
-    + [(21, 7, 8, s) for s in seeds]
-    + [(27, 9, 10, s) for s in seeds]
-    )
+# graph_cases = (
+#     [(27, 3, 4, s) for s in seeds]
+#     + [(10, 5, 6, s) for s in seeds]
+#     + [(21, 7, 8, s) for s in seeds]
+#     + [(27, 9, 10, s) for s in seeds]
+#     )
+graph_cases = [(10,5,6,1501711450)]
 
 @pytest.mark.parametrize("left_vertices,right_deg,left_deg,seed", graph_cases)
 def test_smoketest_random_biregular_graph(left_vertices, right_deg, left_deg, seed):
