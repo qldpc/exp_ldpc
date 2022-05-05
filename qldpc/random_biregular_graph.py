@@ -4,8 +4,6 @@ import itertools
 import pytest
 from typing import Tuple
 
-from sympy import true
-
 def canonicalize_edge(x : Tuple[int, int]) -> Tuple[int, int]:
     return (x[0], x[1]) if x[0] < x[1] else (x[1], x[0])
 
@@ -23,6 +21,9 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
         seed=seed,
         create_using=nx.MultiGraph(),
         )
+
+    # The generator procedure uses the configuration model so we may have a small fraction of multiedges
+    # We can randomly swap edges to get rid of them
 
     # Swap endpoints of edges s.t. we have no multiedges
     # Swapping ensures that we still have a biregular graph at the end
@@ -46,33 +47,30 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
                 if num_edges > 1:
                     multiedge_list.extend(itertools.repeat((node, neighbor_node), num_edges-1))
     
-        print(multiedge_list)
         if len(multiedge_list) == 0:
             break
         
         # ---------------
 
-        edge_removal_list = set()
-        edge_add_list = set()
+        edge_removal_list = list()
+        edge_add_list = list()
 
         # Compute update
         edge_list = list(tanner_graph.edges())
         swap_edges = rng.choice(edge_list, size=len(multiedge_list), replace=False)
         for (edge_a, edge_b) in zip(multiedge_list, swap_edges):
-            new_edge_a = (edge_a[0], edge_b[1])
-            new_edge_b = (edge_b[0], edge_a[1])
+            new_edge_a = canonicalize_edge((edge_a[0], edge_b[1]))
+            new_edge_b = canonicalize_edge((edge_b[0], edge_a[1]))
 
             # We can end up selecting an edge that's already in the multiedge_list
             if canonicalize_edge(edge_b) not in edge_removal_list:
 
-                edge_removal_list.add(canonicalize_edge(edge_a))
-                edge_removal_list.add(canonicalize_edge(edge_b))
+                edge_removal_list.append(canonicalize_edge(edge_a))
+                edge_removal_list.append(canonicalize_edge(edge_b))
 
-                edge_add_list.add(canonicalize_edge(new_edge_a))
-                edge_add_list.add(canonicalize_edge(new_edge_b))
+                edge_add_list.append(new_edge_a)
+                edge_add_list.append(new_edge_b)
         
-        print(f'Remove: {edge_removal_list}')
-        print(f'Add: {edge_add_list}')
         # Apply update
         for e in edge_removal_list:
             # Removes an arbitrary edge if there are multiple edges like e
@@ -105,13 +103,12 @@ seeds = [
     0xa7984b05, 0x82ee5a86, 0xb6cbf54b, 0xce8b63a4,
     ]
 
-# graph_cases = (
-#     [(27, 3, 4, s) for s in seeds]
-#     + [(10, 5, 6, s) for s in seeds]
-#     + [(21, 7, 8, s) for s in seeds]
-#     + [(27, 9, 10, s) for s in seeds]
-#     )
-graph_cases = [(10,5,6,1501711450)]
+graph_cases = (
+    [(27, 3, 4, s) for s in seeds]
+    + [(10, 5, 6, s) for s in seeds]
+    + [(21, 7, 8, s) for s in seeds]
+    + [(27, 9, 10, s) for s in seeds]
+    )
 
 @pytest.mark.parametrize("left_vertices,right_deg,left_deg,seed", graph_cases)
 def test_smoketest_random_biregular_graph(left_vertices, right_deg, left_deg, seed):
