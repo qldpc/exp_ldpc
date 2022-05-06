@@ -50,8 +50,10 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
         gen_B_dual = get_generator_matrix(GF2(partial_B_dense.transpose()))
 
         # Logicals for the dual
-        z_logicals.extend(np.hstack([np.kron(gen_A_dual[i, :], gen_B[j, :]), np.zeros(partial_A_dense.shape[1]*partial_B_dual_dense.shape[1])]).astype(np.uint8) for i in range(gen_A_dual.shape[0]) for j in range(gen_B.shape[0]))
-        z_logicals.extend(np.hstack([np.zeros(gen_A_dual.shape[1] * partial_B_dense.shape[1]), np.kron(gen_A[i, :], gen_B_dual[j, :])]).astype(np.uint8) for i in range(gen_A.shape[0]) for j in range(gen_B_dual.shape[0]))
+        z_logicals.extend(np.hstack([np.kron(gen_A_dual[i, :], gen_B[j, :]), np.zeros(partial_A_dense.shape[1]*partial_B_dual_dense.shape[1])]).astype(np.uint8)
+                        for i in range(gen_A_dual.shape[0]) for j in range(gen_B.shape[0]))
+        z_logicals.extend(np.hstack([np.zeros(gen_A_dual.shape[1] * partial_B_dense.shape[1]), np.kron(gen_A[i, :], gen_B_dual[j, :])]).astype(np.uint8)
+                        for i in range(gen_A.shape[0]) for j in range(gen_B_dual.shape[0]))
 
         # Don't worry about the non self-dual case for now
         assert (partial_A != partial_B.transpose()).nnz == 0
@@ -68,6 +70,9 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     # C0 dimension
     assert partial_1.shape[0] == partial_A.shape[0]*partial_B.shape[0]
 
-    assert(len(x_logicals) == len(z_logicals))
+    assert len(x_logicals) == len(z_logicals)
+
+    # Check number of logicals + number of checks == number of qubits
+    assert len(x_logicals) + partial_2.shape[1] + partial_1.shape[0] == partial_2.shape[0]
 
     return ((partial_2.tocsc().astype(np.uint8), partial_1.tocsr().astype(np.uint8), num_cols(partial_1)), logicals)

@@ -45,6 +45,12 @@ def gf2_row_reduce(A : np.array) -> [int]:
 
     return pivot_cols
 
+def get_rank(A : np.array) -> int:
+    A_reduced = np.copy(A)
+    gf2_row_reduce(A_reduced)
+    nonzero_rows = np.count_nonzero(A_reduced, axis=1)
+    return np.count_nonzero(nonzero_rows)
+
 def get_generator_matrix(H : np.array) -> np.array:
     '''Returns a full rank encoding map G that satisfies HG^T = 0'''
     rr_H = np.copy(H)
