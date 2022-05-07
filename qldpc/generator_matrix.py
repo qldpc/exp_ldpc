@@ -1,9 +1,56 @@
 from .qecc_util import GF2
 import numpy as np
+from numba import njit
 
 def gf2_smith_normal_form(A: np.array) -> (np.array, np.array, np.array):
-    '''Returns the Smith normal form of A'''
-    pass
+    '''Returns the Smith normal form of D=SAT. Based on the Galois decomposition routines'''
+    D = A.copy()
+    S = GF2.Identity(A.shape[0])
+    T = GF2.Identity(A.shape[1])
+
+    row_reduce_coeffs = GF2.Zeros(A.shape[0])
+
+    # row reduce 
+    pivot = 0
+    for j in range(D.shape[1]):
+        nonzero_idx = np.nonzero(D[pivot:, j])[0]
+        # No pivot in this column
+        if nonzero_idx.size == 0:
+            continue
+
+        i = pivot + nonzero_idx[0]
+
+        if pivot != i:
+            # D[i,j] is pivot so row swap to fix it
+            D[[pivot,i], :] = D[[i,pivot], :]
+            S[[pivot,i], :] = S[[i,pivot], :]
+
+        # Add row to other rows
+        row_reduce_coeffs[:] = D[:, j]
+        row_reduce_coeffs[pivot] = 0
+
+        D[:,:] -= np.multiply.outer(row_reduce_coeffs, D[pivot,:])
+        S[:,:] += np.multiply.outer(row_reduce_coeffs, S[pivot,:])
+        
+        # exit condition
+        pivot += 1
+        if pivot == D.shape[0]:
+            break
+
+    # Permute columns to put 1s on diagonal
+    for i in range(D.shape[0]):
+        nonzero_idx = np.nonzero(D[i, :])[0]
+        if nonzero_idx.size == 0:
+            break
+        pivot = nonzero_idx[0]
+
+        # Swap current column with pivot column
+        if pivot != i:
+            D[:, [pivot, i]] = D[:, [i,pivot]]
+            T[:, [pivot, i]] = T[:, [i,pivot]]
+    
+    return (D, S, T)
+    
 
 def gf2_row_reduce(A : np.array) -> [int]:
     '''Put a matrix in reduced row echeleon form and return the pivot columns'''
@@ -74,7 +121,16 @@ def get_generator_matrix(H : np.array) -> np.array:
         G[:, standard_col_indices] = tempG
     
     return G
-    
+
+
+def test_gf2_smith_normal_form():
+    for rows in [4, 8, 16, 32]:
+        for cols in [4, 8, 16, 32]:
+            for _ in range(200):
+                A = GF2(np.where(np.random.rand(rows, cols) < 0.3, 1, 0))
+                D, S, T = gf2_smith_normal_form(A)
+
+                assert np.all(D == S@A@T)
 
 def test_gf2_row_reduce():
     for rows in [2, 4, 8, 16, 32]:
@@ -115,3 +171,5 @@ def test_generator_matrix():
                 pivots = gf2_row_reduce(G.transpose())
                 assert(len(pivots) == G.shape[0])
 
+
+                
