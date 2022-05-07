@@ -12,7 +12,7 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     if check_complex is None:
         check_complex = False
 
-    # D^A x I + I x D^B A_1 x B_1 -> A_0 x B_1 + A_1 x B_0
+    # D^A x I + I x D^B : A_1 x B_1 -> A_0 x B_1 + A_1 x B_0
     partial_2 = sparse.vstack([
         sparse.kron(partial_A, sparse.identity(partial_B.shape[1])),
         sparse.kron(sparse.identity(partial_A.shape[1]), partial_B)
@@ -35,27 +35,27 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     z_logicals = []
     if compute_logicals:
         # Find the logicals as Im D^A x Ker D^B + Ker D^A x Im D^B
-        partial_A_dense = partial_A.todense()
-        partial_B_dense = partial_B.todense()
+        partial_A_gf2 = GF2(partial_A.todense())
+        partial_B_gf2 = GF2(partial_B.todense())
+
+        # Each row is a basis vector for the kernel / cokernel
+        a_kernel = partial_A_gf2.null_space()
+        b_kernel = partial_B_gf2.null_space()
+
+        a_cokernel = partial_A_gf2.left_null_space()
+        b_cokernel = partial_B_gf2.left_null_space()
+
+        A0B1_zero = np.zeros(partial_A.shape[0] * partial_B.shape[1], dtype=np.uint8)
+        A1B0_zero = np.zeros(partial_A.shape[1] * partial_B.shape[0], dtype=np.uint8)
+
+        print(f'{a_kernel.shape=} {b_kernel.shape=} {a_cokernel.shape=} {b_cokernel.shape=} {A0B1_zero.shape=} {A1B0_zero.shape=}')
         
-        # rows of gen_A are the basis
-        gen_A = get_generator_matrix(GF2(partial_A_dense))
-        gen_B = get_generator_matrix(GF2(partial_B_dense))
-
-        partial_A_dual_dense = partial_A_dense.transpose()
-        partial_B_dual_dense = partial_B_dense.transpose()
-
-        # Rows of the generator for the transpose code are a basis for the orthogonal complement of the image of the check matrix 
-        gen_A_dual = get_generator_matrix(GF2(partial_A_dense.transpose()))
-        gen_B_dual = get_generator_matrix(GF2(partial_B_dense.transpose()))
-
-        # Logicals for the dual
-        z_logicals.extend(np.hstack([np.kron(gen_A_dual[i, :], gen_B[j, :]), np.zeros(partial_A_dense.shape[1]*partial_B_dual_dense.shape[1])]).astype(np.uint8) for i in range(gen_A_dual.shape[0]) for j in range(gen_B.shape[0]))
-        z_logicals.extend(np.hstack([np.zeros(gen_A_dual.shape[1] * partial_B_dense.shape[1]), np.kron(gen_A[i, :], gen_B_dual[j, :])]).astype(np.uint8) for i in range(gen_A.shape[0]) for j in range(gen_B_dual.shape[0]))
+        x_logicals.extend(np.hstack([A0B1_zero, np.kron(a_kernel[i,:], b_cokernel[j,:])]) for i in range(a_kernel.shape[0]) for j in range(b_cokernel.shape[0]))
+        x_logicals.extend(np.hstack([np.kron(a_cokernel[i,:], b_kernel[j,:]), A1B0_zero]) for i in range(a_cokernel.shape[0]) for j in range(b_kernel.shape[0]))
 
         # Don't worry about the non self-dual case for now
         assert (partial_A != partial_B.transpose()).nnz == 0
-        x_logicals = z_logicals
+        z_logicals = x_logicals
         
 
     logicals = (x_logicals, z_logicals, len(x_logicals))
