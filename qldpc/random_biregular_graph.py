@@ -22,6 +22,9 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
         create_using=nx.MultiGraph(),
         )
 
+    # The generator procedure uses the configuration model so we may have a small fraction of multiedges
+    # We can randomly swap edges to get rid of them
+
     # Swap endpoints of edges s.t. we have no multiedges
     # Swapping ensures that we still have a biregular graph at the end
     # It is possible that this procedure creates multiedges because we do not enforce that (a, b') does not already exist
@@ -49,30 +52,33 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
         
         # ---------------
 
-        edge_removal_list = set()
-        edge_add_list = set()
+        edge_removal_list = list()
+        edge_add_list = list()
 
         # Compute update
         edge_list = list(tanner_graph.edges())
         swap_edges = rng.choice(edge_list, size=len(multiedge_list), replace=False)
         for (edge_a, edge_b) in zip(multiedge_list, swap_edges):
-            new_edge_a = (edge_a[0], edge_b[1])
-            new_edge_b = (edge_b[0], edge_a[1])
+            new_edge_a = canonicalize_edge((edge_a[0], edge_b[1]))
+            new_edge_b = canonicalize_edge((edge_b[0], edge_a[1]))
 
             # We can end up selecting an edge that's already in the multiedge_list
-            if canonicalize_edge(edge_b) not in edge_removal_list:
+            no_double_remove = canonicalize_edge(edge_b) not in edge_removal_list
+            if no_double_remove:
 
-                edge_removal_list.add(canonicalize_edge(edge_a))
-                edge_removal_list.add(canonicalize_edge(edge_b))
+                edge_removal_list.append(canonicalize_edge(edge_a))
+                edge_removal_list.append(canonicalize_edge(edge_b))
 
-                edge_add_list.add(canonicalize_edge(new_edge_a))
-                edge_add_list.add(canonicalize_edge(new_edge_b))
+                edge_add_list.append(new_edge_a)
+                edge_add_list.append(new_edge_b)
         
         # Apply update
         for e in edge_removal_list:
             # Removes an arbitrary edge if there are multiple edges like e
             tanner_graph.remove_edge(*e, key=None)
         tanner_graph.add_edges_from(edge_add_list)
+        
+        check_biregular(tanner_graph, data_degree, check_degree, False)
     else:
         raise RuntimeError('Unable to remove multiedges from the graph')
 
@@ -80,7 +86,9 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
 
     return tanner_graph
         
-def check_biregular(G, data_degree, check_degree):
+def check_biregular(G, data_degree, check_degree, check_type=True):
+    if check_type is True:
+        assert type(G) is nx.Graph
     # Consistency check
     for (node, degree) in G.degree():
         if G.nodes[node]['bipartite'] == 0:
