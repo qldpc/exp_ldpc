@@ -44,10 +44,11 @@ def test_smoketest_biregular_hpg():
     # X logicals commute with Z checks
     assert np.all((z_checks @ x_logicals.transpose())%2 == 0)
 
+    assert get_rank(x_logicals) == x_logicals.shape[0]
+    assert get_rank(z_logicals) == z_logicals.shape[0]
     # X and Z logicals come in pairs
-    print((z_logicals @ x_logicals.transpose())%2)
-    assert np.count_nonzero((z_logicals @ x_logicals.transpose())%2) == z_logicals.shape[0]
-    b
+    assert np.count_nonzero(z_logicals @ x_logicals.transpose()) == z_logicals.shape[0]
+
     # In general the checks may not be independent ex. toric code
     x_checks = x_checks.todense()
     z_checks = z_checks.todense()
