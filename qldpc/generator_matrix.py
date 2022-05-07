@@ -2,13 +2,34 @@ from .qecc_util import GF2
 import numpy as np
 from numba import njit
 
+@njit
+def row_swap(A: np.array, i, j):
+    '''Swap rows i and j in A'''
+    for k in range(A.shape[1]):
+        t = A[i,k]
+        A[i,k] = A[j,k]
+        A[j,k] = t
+
+@njit
+def col_swap(A: np.array, i, j):
+    '''Swap columns i and j in A'''
+    for k in range(A.shape[0]):
+        t = A[k,i]
+        A[k,i] = A[k,j]
+        A[k,j] = t
+
 def gf2_smith_normal_form(A: np.array) -> (np.array, np.array, np.array):
     '''Returns the Smith normal form of D=SAT. Based on the Galois decomposition routines'''
-    D = A.copy()
-    S = GF2.Identity(A.shape[0])
-    T = GF2.Identity(A.shape[1])
+    return _gf2_smith_normal_form(np.array(A).astype(np.int8))
 
-    row_reduce_coeffs = GF2.Zeros(A.shape[0])
+@njit
+def _gf2_smith_normal_form(A: np.array) -> (np.array, np.array, np.array):
+    '''Returns the Smith normal form of D=SAT. Based on the Galois decomposition routines'''
+    D = A.copy()
+    S = np.eye(A.shape[0], dtype=np.int8)
+    T = np.eye(A.shape[1], dtype=np.int8)
+
+    row_reduce_coeffs = np.zeros(D.shape[0], dtype=np.int8)
 
     # row reduce 
     pivot = 0
@@ -20,24 +41,26 @@ def gf2_smith_normal_form(A: np.array) -> (np.array, np.array, np.array):
 
         i = pivot + nonzero_idx[0]
 
+        # D[i,j] is pivot so row swap to fix it
         if pivot != i:
-            # D[i,j] is pivot so row swap to fix it
-            D[[pivot,i], :] = D[[i,pivot], :]
-            S[[pivot,i], :] = S[[i,pivot], :]
+            row_swap(D, pivot, i)
+            row_swap(S, pivot, i)
 
         # Add row to other rows
         row_reduce_coeffs[:] = D[:, j]
         row_reduce_coeffs[pivot] = 0
 
-        D[:,:] -= np.multiply.outer(row_reduce_coeffs, D[pivot,:])
-        S[:,:] += np.multiply.outer(row_reduce_coeffs, S[pivot,:])
+        D[:,:] = (D[:,:] + np.outer(row_reduce_coeffs, D[pivot,:]))%2
+        S[:,:] = (S[:,:] + np.outer(row_reduce_coeffs, S[pivot,:]))%2
         
         # exit condition
         pivot += 1
         if pivot == D.shape[0]:
             break
 
+    col_reduce_coeffs = np.zeros(D.shape[1], dtype=np.int8)
     # Permute columns to put 1s on diagonal
+    # TODO: handle junk on the right side for short / wide matrix
     for i in range(D.shape[0]):
         nonzero_idx = np.nonzero(D[i, :])[0]
         if nonzero_idx.size == 0:
@@ -46,11 +69,26 @@ def gf2_smith_normal_form(A: np.array) -> (np.array, np.array, np.array):
 
         # Swap current column with pivot column
         if pivot != i:
-            D[:, [pivot, i]] = D[:, [i,pivot]]
-            T[:, [pivot, i]] = T[:, [i,pivot]]
-    
+            col_swap(D, pivot, i)
+            col_swap(T, pivot, i)
+
+        # Reduce columns
+        col_reduce_coeffs[:] = D[i, :]
+        col_reduce_coeffs[i] = 0
+
+        D[:,:] = (D[:,:] + np.outer(D[:,i], col_reduce_coeffs))%2
+        T[:,:] = (T[:,:] + np.outer(T[:,i], col_reduce_coeffs))%2
+
     return (D, S, T)
     
+def gf2_coker(A: np.array):
+    '''Returns a matrix where the rows form a basis for the cokernel of A'''
+    D, S, T = gf2_smith_normal_form(A)
+    # Be lazy for now
+    S_inv = np.linalg.inv(GF2(S))
+    T_inv = np.linalg.inv(GF2(T))
+    coker_cols = [i for i in range(min(D.shape)) if D[i,i] == 0]
+    return (S_inv @ GF2(np.eye(D.shape[0], D.shape[1], dtype=np.int8) - D) @ T_inv)[coker_cols, :].T
 
 def gf2_row_reduce(A : np.array) -> [int]:
     '''Put a matrix in reduced row echeleon form and return the pivot columns'''
@@ -124,13 +162,13 @@ def get_generator_matrix(H : np.array) -> np.array:
 
 
 def test_gf2_smith_normal_form():
-    for rows in [4, 8, 16, 32]:
-        for cols in [4, 8, 16, 32]:
+    for rows in [4, 8, 16, 32, 64]:
+        for cols in [4, 8, 16, 32, 64]:
             for _ in range(200):
-                A = GF2(np.where(np.random.rand(rows, cols) < 0.3, 1, 0))
+                A = np.where(np.random.rand(rows, cols) < 0.3, 1, 0)
                 D, S, T = gf2_smith_normal_form(A)
 
-                assert np.all(D == S@A@T)
+                assert np.all(D == GF2(S)@GF2(A)@GF2(T))
 
 def test_gf2_row_reduce():
     for rows in [2, 4, 8, 16, 32]:
