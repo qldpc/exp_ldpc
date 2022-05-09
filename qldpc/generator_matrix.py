@@ -86,9 +86,8 @@ def gf2_coker(A: np.array):
     D, S, T = gf2_smith_normal_form(A)
     # Be lazy for now
     S_inv = np.linalg.inv(GF2(S))
-    T_inv = np.linalg.inv(GF2(T))
-    coker_cols = [i for i in range(min(D.shape)) if D[i,i] == 0]
-    return (S_inv @ GF2(np.eye(D.shape[0], D.shape[1], dtype=np.int8) - D) @ T_inv)[coker_cols, :].T
+    coker_cols = [i for i in range(S_inv.shape[1]) if i >= D.shape[0] or D[i,i] == 0]
+    return S_inv[coker_cols, :].T
 
 def gf2_row_reduce(A : np.array) -> [int]:
     '''Put a matrix in reduced row echeleon form and return the pivot columns'''
