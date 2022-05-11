@@ -3,6 +3,8 @@ name = "exp_ldpc"
 version = "0.1.0"
 edition = "2021"
 publish = false
+repository = "https://github.com/ChrisPattison/exp_ldpc"
+license = "MIT"
 
 authors = ["Chris Pattison <chpattison@gmail.com>"]
 
