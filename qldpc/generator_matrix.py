@@ -20,7 +20,12 @@ def col_swap(A: np.array, i, j):
 
 def gf2_smith_normal_form(A: np.array) -> (np.array, np.array, np.array):
     '''Returns the Smith normal form of D=SAT. Based on the Galois decomposition routines'''
-    return _gf2_smith_normal_form(np.array(A).astype(np.int8))
+    # Wrapper to convert to regular numpy array if it's GF2
+    snf = _gf2_smith_normal_form(np.array(A).astype(np.int8))
+    # Convert back if we started with GF2
+    if type(A) is GF2:
+        snf = tuple(GF2(x) for x in snf)
+    return snf
 
 @njit
 def _gf2_smith_normal_form(A: np.array) -> (np.array, np.array, np.array):
@@ -80,6 +85,34 @@ def _gf2_smith_normal_form(A: np.array) -> (np.array, np.array, np.array):
         T[:,:] = (T[:,:] + np.outer(T[:,i], col_reduce_coeffs))%2
 
     return (D, S, T)
+
+def gf2_homology_generators(D_out: np.array, D_in: np.array):
+    '''Compute the generators for the homology group ker D_out/Im D_in. 
+Heavily inspired by the sage routine _homology_generators_snf in /src/sage/homology/chain_complex.py'''
+
+    D_out = GF2(D_out.astype(int))
+    D_in = GF2(D_in.astype(int))
+
+    # Inclusion map of the kernel
+    # D_out_rank = D_out.matrix_rank()
+    kerD_out_incl = D_out.null_space().transpose()
+
+    # R is a map from ker(D_out) (+) Im(D_in) to dom(D_out) using an arbitrary basis
+    # Im D_in is contained in kerD_out_incl so the augmented matrix should look something like (Q | S )
+    # where all pivots are in Q i.e. the map preserves the vector space sum (+)
+    # We should then just be able to compute the SNF of S and we're done
+    R = np.concatenate((kerD_out_incl, D_in), axis=1)
+    R_rr = R.row_reduce()
+
+    D, S, T = gf2_smith_normal_form(R_rr)
+
+    non_zero = [k for k in range(min(D.shape)) if D[k,k] != 0]
+
+    generators = (R @ np.linalg.inv(T)[:,non_zero]).T
+
+    print(generators.shape)
+    return generators
+
     
 def gf2_coker(A: np.array):
     '''Returns a matrix where the rows form a basis for the cokernel of A'''
@@ -87,9 +120,10 @@ def gf2_coker(A: np.array):
     # Be lazy for now
     S_inv = np.linalg.inv(GF2(S))
     T_inv = np.linalg.inv(GF2(T))
-    coker_cols = [i for i in range(min(D.shape)) if D[i,i] == 0]
-    return (S_inv @ GF2(np.eye(D.shape[0], D.shape[1], dtype=np.int8) - D) @ T_inv)[coker_cols, :].T
 
+    coker_cols = [k for k in range(D.shape[0]) if k >= D.shape[1] or D[k,k] == 0]
+    return (S_inv[:,coker_cols]).T
+        
 def gf2_row_reduce(A : np.array) -> [int]:
     '''Put a matrix in reduced row echeleon form and return the pivot columns'''
     A = A.view(GF2)
