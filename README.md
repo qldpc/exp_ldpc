@@ -52,15 +52,9 @@ pip install maturin
 ```bash
 git clone https://github.com/ChrisPattison/exp_ldpc.git
 cd exp_ldpc
+pip install .
 ```
-and
-```bash
-maturin develop --release
-```
-or (take your pick)
-```bash
-maturin build --release
-pip install target/wheels/exp_ldpc_0.1.0-*.whl
-```
+You can also build with maturin directly ex. `maturin develop --release`
+
 
 Note: the virtual environment will need to be activated any time you want to use the package (step 3)
