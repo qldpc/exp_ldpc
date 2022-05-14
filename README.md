@@ -4,12 +4,12 @@ This repository contains (WIP) research code related to practical implementation
 It is distributed under an MIT license and will eventually be publically open source, but for the moment I ask that you ask for permission before sharing the sources.
 
 ### Caveats
-I have made attempts to test as many pieces as possible, but this is an incomplete research code in an area where many algorithms do not have precise proofs of correctness and thus are difficult to test.
+I have made attempts to test as many pieces as possible, but this is an incomplete research code in an area where many algorithms do not have precise proofs of correctness and thus are difficult to test in pieces.
 
 In particular, while much of the python codebase has good test coverage, the decoders are still fairly experimental.
-Please be careful with the results as the only *real* test that can be done is a full end to end simulation which this codebase has not yet gone through.
+The only *real* test that can be done is a full end to end simulation which this codebase has not yet gone through in its incomplete state.
 
-This is likely to change over the coming months as time permits.
+This will change over the coming months as time permits.
 The routines are also not super well documented, but this will change when they need to be used by someone other than me.
 
 ## Layout
