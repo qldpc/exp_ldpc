@@ -110,7 +110,6 @@ Heavily inspired by the sage routine _homology_generators_snf in /src/sage/homol
 
     generators = (R @ np.linalg.inv(T)[:,non_zero]).T
 
-    print(generators.shape)
     return generators
 
     
@@ -119,8 +118,8 @@ def gf2_coker(A: np.array):
     D, S, T = gf2_smith_normal_form(A)
     # Be lazy for now
     S_inv = np.linalg.inv(GF2(S))
-    coker_cols = [i for i in range(S_inv.shape[1]) if i >= D.shape[0] or D[i,i] == 0]
-    return S_inv[coker_cols, :].T
+    coker_cols = [i for i in range(D.shape[0]) if i >= D.shape[1] or D[i,i] == 0]
+    return S_inv[coker_cols, :]
         
 def gf2_row_reduce(A : np.array) -> [int]:
     '''Put a matrix in reduced row echeleon form and return the pivot columns'''
