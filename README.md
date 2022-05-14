@@ -10,11 +10,12 @@ In particular, while much of the python codebase has good test coverage, the dec
 Please be careful with the results as the only *real* test that can be done is a full end to end simulation which this codebase has not yet gone through.
 
 This is likely to change over the coming months as time permits.
+The routines are also not super well documented, but this will change when they need to be used by someone other than me.
 
 ## Layout
 This is organized as a Python library for generating quantum codes, generating syndrome extraction circuits, and setting up QEC experiments.
 In particular, there is a python package `qldpc` and some python scripts to do stuff with it in `/scripts`.
-The python package will work without the rust library, but the only installation method is currently through maturin instead of setuptools.
+The python package will work without the rust library, but the only installation method is currently through PEP 517 + maturin instead of setuptools.
 
 There is an (incomplete) Rust library for decoding.
 
@@ -44,11 +45,8 @@ python -m venv my_python_virtual_environment
 ```bash
 source my_python_virtual_environment/bin/activate
 ```
-4) Install maturin into it
-```bash
-pip install maturin
-```
-5) Install the qldpc package into the virtual environment
+
+4) Install the qldpc package into the virtual environment
 ```bash
 git clone https://github.com/ChrisPattison/exp_ldpc.git
 cd exp_ldpc
@@ -58,3 +56,12 @@ You can also build with maturin directly ex. `maturin develop --release`
 
 
 Note: the virtual environment will need to be activated any time you want to use the package (step 3)
+
+## Generating a code and syndrome extraction circuit
+Try `python /scripts/generate_code_circuit.py --help` and `python /scripts/generate_code_circuit.py 4 3 12 --rounds 1 --save_code code.txt --save_circuit circuit.txt`
+to generate a (3,4) hypergraph product code on 225 qubits with 108 X and Z checks and 9 logicals.
+Constructing the logicals is a bit tricky and is currently done through Sage.
+
+### Code Format
+The routines `qldpc.write_check_generators` and `qldpc.read_check_generators` read and write the code format specification giving out a scipy sparse matrix that is the X and Z check matrices.
+The check format is roughly inspired by DIMACS with a header denoting number of qubits, number of X checks, number of Z checks, and then listing the supports of each X and Z check
