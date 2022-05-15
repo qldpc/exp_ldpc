@@ -3,7 +3,7 @@ import networkx as nx
 import numpy as np
 from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, num_cols, num_rows
 from .random_biregular_graph import random_biregular_graph
-from .generator_matrix import get_rank
+from .linalg import get_rank
 
 def biregular_hpg(num_data : int, data_degree : int, check_degree : int, seed=None, graph_multiedge_retries=None, compute_logicals=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     ''' Constructs a hypergraph product code defined by a single (data_degree, check_degree)-regular bipartite graph

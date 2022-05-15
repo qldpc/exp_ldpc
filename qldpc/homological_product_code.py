@@ -3,30 +3,39 @@ import networkx as nx
 import itertools
 import numpy as np
 from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, num_cols, num_rows, GF2
-from .generator_matrix import get_generator_matrix, gf2_coker, gf2_homology_generators
+from .linalg import get_rank, gf2_get_pivots
 
-def compute_homology_reps(partial_A : GF2, partial_B : GF2, dual=False) -> GF2:
-    '''Compute representatives of the homology group of the total complex of A and B'''
+def compute_homology_reps(partial_2 : GF2, partial_1 : GF2, dual=False) -> GF2:
+    '''Compute representatives of the homology group of the complex defined by partial_1 . partial_2 = 0'''
 
-    # Each row is a basis vector for the kernel / cokernel
-    a_kernel = partial_A.null_space()
-    b_kernel = partial_B.null_space()
+    kernel = partial_1.null_space()
+    image = partial_2.column_space() # This is already row reduced
 
-    a_cokernel = gf2_coker(partial_A)
-    b_cokernel = gf2_coker(partial_B)
+    # We have a basis for the image and we want to extend this to a basis of the kernel
+    # Axler 2.B shows how to do this by extending the basis one at a time
 
-    A0B1_zero = np.zeros(partial_A.shape[0] * partial_B.shape[1], dtype=np.uint8)
-    A1B0_zero = np.zeros(partial_A.shape[1] * partial_B.shape[0], dtype=np.uint8)
+    reduced_aug_matrix = np.hstack([image.T, kernel.T]).row_reduce()
+    # The pivot columns tell us a spanning set for the vector space
+    # image.T is already row reduced so the remainder must be the complement in the kernel
+    pivot_cols = gf2_get_pivots(reduced_aug_matrix)
+    generator_indices = pivot_cols[image.shape[0]:] - image.shape[0]
 
-    # Since the factors are 2-complexes, H_1 is (coker x ker) + (ker x coker)
-    # When we take the dual (transpose) the order of the terms in the direct sum get swapped
-    sum_order = -1 if dual else 1
-    
-    hom_reps = []
-    hom_reps.extend(np.hstack([A0B1_zero, np.kron(a_kernel[i,:], b_cokernel[j,:])][::sum_order]) for i in range(a_kernel.shape[0]) for j in range(b_cokernel.shape[0]))
-    hom_reps.extend(np.hstack([np.kron(a_cokernel[i,:], b_kernel[j,:]), A1B0_zero][::sum_order]) for i in range(a_cokernel.shape[0]) for j in range(b_kernel.shape[0]))
-    
-    return hom_reps
+    return kernel[generator_indices,:]
+
+def compute_logical_pairs(z_logicals : GF2, x_logicals : GF2) -> GF2:
+    '''Given a set of logicals (z_logicals, x_logicals) return a new set of Z logicals so that we have pairs (Z_k, X_k) and {Z_k,X_k} = \delta_kk'''
+
+    # We do this by row reducing the matrix of inner products to the identity, keeping track of the operations
+    # We form the augmented matrix (LzLx^T | Lz) (where rows are the logicals as F2 vectors)        
+    inner_products = z_logicals @ x_logicals.T
+    num_pairs = inner_products.shape[1]
+        
+    z_logicals_aug = GF2(np.hstack([inner_products, z_logicals]))
+    z_logicals_aug = z_logicals_aug.row_reduce(ncols=num_pairs)
+    z_logicals = z_logicals_aug[:,num_pairs:]
+
+    return z_logicals    
+
 
 def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix, check_complex = None, compute_logicals = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     '''Compute the homological product of two 2-complexes defined by their non-trivial boundary map
@@ -39,14 +48,14 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     partial_2 = sparse.vstack([
         sparse.kron(partial_A, sparse.identity(partial_B.shape[1])),
         sparse.kron(sparse.identity(partial_A.shape[1]), partial_B)
-    ])
+    ]).astype(np.int8)
     
     partial_1_factors = [
         sparse.kron(sparse.identity(partial_A.shape[0]), partial_B),
         sparse.kron(partial_A, sparse.identity(partial_B.shape[0]))
     ]
 
-    partial_1 = sparse.hstack(partial_1_factors)
+    partial_1 = sparse.hstack(partial_1_factors).astype(np.int8)
 
     if check_complex:
         assert np.all((partial_1 @ partial_2).data % 2 == 0)
@@ -54,27 +63,16 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     if compute_logicals is None:
         compute_logicals = False
 
-    x_logicals = []
-    z_logicals = []
+    x_logicals = np.zeros((0,partial_1.shape[1]), dtype=np.int8)
+    z_logicals = np.zeros((0,partial_1.shape[1]), dtype=np.int8)
     if compute_logicals:
-        # Find the logicals as Im D^A x Ker D^B + Ker D^A x Im D^B
-        partial_A_gf2 = GF2(partial_A.todense())
-        partial_B_gf2 = GF2(partial_B.todense())
+        partial_1_dense = GF2(partial_1.todense())
+        partial_2_dense = GF2(partial_2.todense())
 
-        x_logicals = compute_homology_reps(partial_A_gf2, partial_B_gf2)
-        z_logicals_unpaired = np.vstack(compute_homology_reps(partial_A_gf2.transpose(), partial_B_gf2.transpose(), dual=True))
-
-        # compute new Z logicals (by multiplying different Z logicals together as operators) s.t. each logical anticommutes with exactly one X logical
-        # We do this by row reducing the matrix of inner products to the identity, keeping track of the operations
-        # We form the augmented matrix (LzLx^T | Lz) (where rows are the logicals as F2 vectors)
+        x_logicals = compute_homology_reps(partial_2_dense, partial_1_dense)
+        z_logicals = compute_homology_reps(partial_1_dense.T, partial_2_dense.T)
+        z_logicals = compute_logical_pairs(z_logicals, x_logicals)
         
-        inner_products = z_logicals_unpaired @ np.vstack(x_logicals).T
-        z_logicals_aug = GF2(np.hstack([inner_products, z_logicals_unpaired]))
-
-        num_pairs = inner_products.shape[1]
-        z_logicals_paired = z_logicals_aug.row_reduce(ncols=num_pairs)[:,num_pairs:]
-        z_logicals = [z_logicals_paired[i,:] for i in range(z_logicals_paired.shape[0])]
-       
         if check_complex:
             for l in x_logicals:
                 assert np.all((partial_1 @ l) % 2 == 0)
@@ -82,7 +80,10 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
             for l in z_logicals:
                 assert np.all((partial_2.T @ l) % 2 == 0)
             
-    logicals = (x_logicals, z_logicals, len(x_logicals))
+    logicals = (
+        [x_logicals[i,:] for i in range(x_logicals.shape[0])],
+        [z_logicals[i,:] for i in range(z_logicals.shape[0])],
+        len(x_logicals))
 
     # C2 dimension
     assert partial_2.shape[1] == partial_A.shape[1]*partial_B.shape[1]
