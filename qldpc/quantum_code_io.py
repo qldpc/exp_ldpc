@@ -2,7 +2,7 @@ from io import IOBase
 import scipy
 from scipy import sparse
 import numpy as np
-from .qecc_util import QuantumCodeChecks, make_check_matrix, num_rows, num_cols
+from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, make_check_matrix, num_rows, num_cols
 
 def read_check_generators(stream : IOBase, validate_stabilizer_code = None) -> QuantumCodeChecks:
     if validate_stabilizer_code is None:
@@ -56,6 +56,12 @@ def read_check_generators(stream : IOBase, validate_stabilizer_code = None) -> Q
 
 def write_check_generators(stream : IOBase, checks : QuantumCodeChecks):
     (x_checks, z_checks, num_qubits) = checks
+
+    # This is sometimes convenient to use this routine to save logicals
+    if type(x_checks) is list:
+        x_checks = np.vstack(x_checks)
+    if type(z_checks) is list:
+        z_checks = np.vstack(z_checks)
     
     assert num_cols(x_checks) == num_cols(z_checks)
     assert num_cols(x_checks) == num_qubits
