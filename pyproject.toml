@@ -8,7 +8,7 @@ dependencies = [
 "matplotlib",
 "pypdf2",
 "pytest",
-"networkx",
+"networkx<3.0.0",
 ]
 
 [build-system]
