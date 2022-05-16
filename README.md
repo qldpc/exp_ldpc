@@ -48,7 +48,7 @@ source my_python_virtual_environment/bin/activate
 
 4) Install the qldpc package into the virtual environment
 ```bash
-git clone https://github.com/ChrisPattison/exp_ldpc.git
+git clone https://github.com/qldpc/exp_ldpc.git
 cd exp_ldpc
 pip install .
 ```
