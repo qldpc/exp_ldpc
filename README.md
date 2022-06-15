@@ -57,6 +57,13 @@ You can also build with maturin directly ex. `maturin develop --release`
 
 Note: the virtual environment will need to be activated any time you want to use the package (step 3)
 
+## Alternate Installation (Singularity)
+The repository contains a container definition that you can use to build a container with the qldpc package installed
+```bash
+git clone https://github.com/qldpc/exp_ldpc.git
+sudo singularity build ldpc.sif exp_ldpc/ldpc.def
+```
+
 ## Generating a code and syndrome extraction circuit
 Try `python /scripts/generate_code_circuit.py --help` and `python /scripts/generate_code_circuit.py 4 3 12 --rounds 1 --save_code code.txt --save_circuit circuit.txt`
 to generate a (3,4) hypergraph product code on 225 qubits with 108 X and Z checks and 9 logicals.
