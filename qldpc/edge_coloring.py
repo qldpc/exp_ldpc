@@ -10,6 +10,13 @@ def _canonicalize_edge(e):
     (u,v) = (u,v) if u < v else (v,u)
     return (u,v) + e[2:]
 
+def _edges_with_keys(G : nx.Graph):
+    try:
+        return G.edges(keys=True)
+    except TypeError:
+        return G.edges()
+
+
 def edge_color_bipartite(bipartite_graph : nx.Graph) -> List[Set[int]]:
     '''Given a bipartite graph, return an optimal edge coloring in time O(|VG||EG|).
     This uses the construction in Konz's proof that all bipartite graphs are class 1.'''
@@ -27,7 +34,7 @@ def edge_color_bipartite(bipartite_graph : nx.Graph) -> List[Set[int]]:
     ColorSet = namedtuple('ColorSets', ['vertices', 'edges'])
     colorings = [ColorSet(set(), set()) for _ in range(graph_degree)]
 
-    for edge in G.edges():
+    for edge in _edges_with_keys(G):
         (u, v) = edge[:2]
         u_set = None
         try:
@@ -116,7 +123,7 @@ def check_graph(test_graph):
 
         assert(len(colored_sets) == max(map(lambda x: x[1], test_graph.degree())))
 
-        for edge in test_graph.edges():
+        for edge in _edges_with_keys(test_graph):
             # Each edge is colored exactly once
             assert sum(1 for coloring in colored_sets if _canonicalize_edge(edge) in coloring) == 1
         for node in test_graph.nodes():
