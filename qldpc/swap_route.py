@@ -5,6 +5,7 @@ import networkx as nx
 from .edge_coloring import edge_color_bipartite
 from collections import deque
 from typing import List,Tuple,Deque
+import pytest
 
 def product_permutation_route(R : npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
     '''Compute a permutation routing on a graph isomorphic to some product G x H.
@@ -88,8 +89,7 @@ def _even_odd_sort_inplace(interval, compare, swap):
     '''
     
     swap_list = deque()
-    # for n in range(interval-1):
-    for n in range(2*interval):
+    for n in range(interval):
         swap_timestep = deque()
         index_set = range(0, interval-1, 2) if n % 2 == 0 else range(1, interval-1, 2)
         for i in index_set:
@@ -160,11 +160,11 @@ def _random_permutation(G_size, H_size):
     permutation = np.reshape(permutation, (G_size, H_size, 2))
     return permutation
 
-def test_product_permutation_route():
+HG_sizes = [(11,7), (10, 5), (6, 8), (6, 9)]
+
+@pytest.mark.parametrize('G_size,H_size', HG_sizes)
+def test_product_permutation_route(G_size, H_size):
     # Test that the routing returned by product permutation route is congestion-free
-    
-    G_size = 11
-    H_size = 7
 
     for _ in range(100):
         permutation = _random_permutation(G_size, H_size)
@@ -199,10 +199,8 @@ def test_product_permutation_route():
             for j in range(H_size):
                 assert tuple(route[i,j,:2]) == (i,j)
 
-
-def test_grid_permutation_route():
-    G_size = 11
-    H_size = 7
+@pytest.mark.parametrize('G_size,H_size', HG_sizes)
+def test_grid_permutation_route(G_size, H_size):
 
     for _ in range(100):
         permutation = _random_permutation(G_size, H_size)
