@@ -1,0 +1,8 @@
+galois
+pandas
+numpy
+scipy
+matplotlib
+pypdf2
+pytest
+networkx
