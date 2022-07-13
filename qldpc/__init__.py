@@ -7,5 +7,5 @@ from .swap_route import grid_permutation_route
 import warnings
 try:
     from .qldpc import ErrorCorrectingCode, FirstMinBeliefProp, SmallSetFlip, FirstMinBPplusSSF
-except ModuleNotFoundError:
-    warnings.warn('Unable to import qldpc decoder library')
+except (ModuleNotFoundError, ImportError) as e:
+    warnings.warn(f'Unable to import qldpc decoder library: {e}')
