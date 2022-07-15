@@ -36,6 +36,31 @@ def compute_logical_pairs(z_logicals : GF2, x_logicals : GF2) -> GF2:
 
     return z_logicals    
 
+def get_logicals(partial_1 : sparse.spmatrix, partial_2 : sparse.spmatrix, compute_logicals) -> QuantumCodeLogicals:
+    x_logicals = np.zeros((0,partial_1.shape[1]), dtype=np.int8)
+    z_logicals = np.zeros((0,partial_1.shape[1]), dtype=np.int8)
+    if compute_logicals:
+        partial_1_dense = GF2(partial_1.todense())
+        partial_2_dense = GF2(partial_2.todense())
+
+        x_logicals = compute_homology_reps(partial_2_dense, partial_1_dense)
+        z_logicals = compute_homology_reps(partial_1_dense.T, partial_2_dense.T)
+        z_logicals = compute_logical_pairs(z_logicals, x_logicals)
+        
+        if check_complex:
+            for l in x_logicals:
+                assert np.all((partial_1 @ l) % 2 == 0)
+                
+            for l in z_logicals:
+                assert np.all((partial_2.T @ l) % 2 == 0)
+            
+    logicals = (
+        [x_logicals[i,:] for i in range(x_logicals.shape[0])],
+        [z_logicals[i,:] for i in range(z_logicals.shape[0])],
+        len(x_logicals))
+    return logicals
+
+    
 
 def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix, check_complex = None, compute_logicals = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     '''Compute the homological product of two 2-complexes defined by their non-trivial boundary map
@@ -62,28 +87,7 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
 
     if compute_logicals is None:
         compute_logicals = False
-
-    x_logicals = np.zeros((0,partial_1.shape[1]), dtype=np.int8)
-    z_logicals = np.zeros((0,partial_1.shape[1]), dtype=np.int8)
-    if compute_logicals:
-        partial_1_dense = GF2(partial_1.todense())
-        partial_2_dense = GF2(partial_2.todense())
-
-        x_logicals = compute_homology_reps(partial_2_dense, partial_1_dense)
-        z_logicals = compute_homology_reps(partial_1_dense.T, partial_2_dense.T)
-        z_logicals = compute_logical_pairs(z_logicals, x_logicals)
-        
-        if check_complex:
-            for l in x_logicals:
-                assert np.all((partial_1 @ l) % 2 == 0)
-                
-            for l in z_logicals:
-                assert np.all((partial_2.T @ l) % 2 == 0)
-            
-    logicals = (
-        [x_logicals[i,:] for i in range(x_logicals.shape[0])],
-        [z_logicals[i,:] for i in range(z_logicals.shape[0])],
-        len(x_logicals))
+    logicals = get_logicals(partial_1, partial_2, compute_logicals)
 
     # C2 dimension
     assert partial_2.shape[1] == partial_A.shape[1]*partial_B.shape[1]
