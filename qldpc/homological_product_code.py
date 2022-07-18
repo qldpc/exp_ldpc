@@ -23,7 +23,7 @@ def compute_homology_reps(partial_2 : GF2, partial_1 : GF2, dual=False) -> GF2:
     return kernel[generator_indices,:]
 
 def compute_logical_pairs(z_logicals : GF2, x_logicals : GF2) -> GF2:
-    '''Given a set of logicals (z_logicals, x_logicals) return a new set of Z logicals so that we have pairs (Z_k, X_k) and {Z_k,X_k} = \delta_kk'''
+    '''Given a set of logicals (z_logicals, x_logicals) return a new set of Z logicals so that we have pairs (Z_k, X_k) and {Z_k,X_k} = delta_kk'''
 
     # We do this by row reducing the matrix of inner products to the identity, keeping track of the operations
     # We form the augmented matrix (LzLx^T | Lz) (where rows are the logicals as F2 vectors)        

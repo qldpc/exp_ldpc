@@ -72,7 +72,7 @@ def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[List[int], List[i
     return (list(range(num_data_qubits)), x_check_ancillas, z_check_ancillas, circuit)
 
 measurement_gates = ['M', 'MZ', 'MX', 'MY', 'MPP', 'MR', 'MRZ', 'MRX', 'MRY']
-measurement_line_pattern = re.compile(f'^(?:\s*)({"|".join(measurement_gates)})((?:\s*\d+\s*)+)$')
+measurement_line_pattern = re.compile(f'^(?:\\s*)({"|".join(measurement_gates)})((?:\\s*\\d+\\s*)+)$')
 
 def rewrite_measurement_noise(p : float, circuit_line : str) -> str:
     search_result = measurement_line_pattern.search(circuit_line)
