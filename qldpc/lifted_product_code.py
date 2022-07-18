@@ -8,58 +8,110 @@ import scipy.sparse as sparse
 from itertools import product
 from collections import deque
 
+from typing import List
 from dataclasses import dataclass
-from abc import ABCMeta, abstractmethod, classmethod
+from abc import ABC, abstractmethod
 
+from galois import GF, FieldArray
 
-class Group(ABCMeta):
+class Group(ABC):
     @classmethod
     @abstractmethod
-    def __mul__(self: Group, other: Group) -> Group:
+    def __mul__(self, other: Group) -> Group:
         pass
 
     @classmethod
     @abstractmethod
-    def inv(self: Group) -> Group:
+    def inv(self) -> Group:
         pass
 
+    @staticmethod
+    def identity(self) -> Group:
+        pass
+    
     @classmethod
-    @abstractmethod
-    def identity(self: Group) -> Group:
-        pass
-
-    def pow(self: Group, x:int) -> Group:
+    def pow(self, x:int) -> Group:
         '''Return g**x where x \in {0,1} i.e. identity or x'''
         assert x == 0 or x == 1
         return self if x == 1 else self.identity()
 
-@dataclass
+@dataclass(frozen=True)
+class PGL2(Group):
+    # TODO: Make this generic
+    data: FieldArray
+    order = 2
+
+    def __init__(self, a : FieldArray):
+        assert a.order == self.order
+        self.data = a
+
+    @classmethod
+    def __mul__(self, other: PGL2) -> PGL2:
+        assert self.order == other.order
+        return type(self)(self.data @ other.data)
+
+    @classmethod
+    def inv(self) -> PGL2:
+        return type(self)(np.linalg.inv(self.data))
+
+    @staticmethod
+    def identity() -> PGL2:
+        return PGL2(GF(PGL2.order).Identity(2))
+
+@dataclass(frozen=True)
 class EdgeEdge:
     e: int
     g: Group
     f: int
 
-@dataclass
+@dataclass(frozen=True)
 class VertexVertex:
     u: (int, int)
     g: Group
     v: (int, int)
 
-@dataclass
+@dataclass(frozen=True)
 class EdgeVertex:
     e: int
     g: Group
     v: (int, int)
 
-@dataclass
+@dataclass(frozen=True)
 class VertexEdge:
     v: (int, int)
     g: Group
     e: int
 
+def morgenstern_generators(l, i) -> List[PGL2]:
+    '''Construct the Morgenstern generators for PGL(2,q^i) with q = 2^l
+    This follows the overview in Dinur et al. (2021) arXiv:2111.04808
+    '''
+    assert l >= 1
+    # This restriction is required by the text
+    assert l % 2 == 0
+    q = 2**l
+    Fq = GF(q)
+    Fqi = GF(q**i)
+
+    # We need to find some solutions, so we'll just exhaustively search for them
+    # Find i \notin F_q s.t. i^2 + i \in F_q
+    i_element = next(filter(lambda x: (x >= q) and (x**2 + x < q), Fqi.Elements()))
+    eps = i_element**2 + i_element
+
+    # Find solutions to g^2 + gd + d^2 epsilon = 1
+    pairs = list(filter(lambda g, d: (g**2 + g*d + d**2 * eps == 1), product(Fq.Elements(), Fq.Elements())))
+    assert len(pairs) == q+1
+    x = Fqi.primitive_element # Is this right?
+    generators = [PGL2(Fqi([[1, (g+d*i_element)],[x*(g+d+d*i_element), 1]])) for (g,d) in pairs]
+    return generators
+
+def test_morgenstern_generators():
+    pass
+    # Do DFS using the generators from the left and from the right to make sure we get the number of elements we expect
+    # Check a \in A implies a^-1 \in A
 
 
-def lifted_product_code(group, gen, h1, h2, check_complex = None, compute_logicals = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_complex = None, compute_logicals = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     ''' group object must implement __mul__ and inv()
         
         E x V -> ExE + VxV -> V x E
@@ -113,7 +165,7 @@ def lifted_product_code(group, gen, h1, h2, check_complex = None, compute_logica
         q_supports[VertexVertex((v1, r1), g, (v2, r2))] = support
 
     # Create indices for everything
-    swap = lambda (x,y): (y,x)
+    swap = lambda : (x[1],x[0])
     x_check_indices = dict(map(swap, enumerate(x_supports.keys())))
     qubit_indices = dict(map(swap, enumerate(q_supports.keys())))
     z_check_indices = dict(map(swap, enumerate(((v1, r1), g, e2) for (v1, r1, g, r2) in product(vertices, h1_system, group, edges))))
