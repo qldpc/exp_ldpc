@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .homological_product_code import homological_product
 import networkx as nx
 import numpy as np
@@ -31,32 +33,31 @@ class Group(ABC):
     
     @classmethod
     def pow(self, x:int) -> Group:
-        '''Return g**x where x \in {0,1} i.e. identity or x'''
+        '''Return g**x where x in {0,1} i.e. identity or x'''
         assert x == 0 or x == 1
         return self if x == 1 else self.identity()
 
-@dataclass(frozen=True)
+# @dataclass(frozen=True)
 class PGL2(Group):
-    # TODO: Make this generic
-    data: FieldArray
-    order = 2
+    _gf : FieldArray
+    data : FieldArray
 
-    def __init__(self, a : FieldArray):
-        assert a.order == self.order
-        self.data = a
+    def __init__(self, gf : FieldArray, data) -> None:
+        super().__init__()
+        self._gf = gf
+        self.data = gf(data)
 
     @classmethod
     def __mul__(self, other: PGL2) -> PGL2:
-        assert self.order == other.order
-        return type(self)(self.data @ other.data)
+        return type(self)(self._gf, self.data @ other.data)
 
     @classmethod
     def inv(self) -> PGL2:
-        return type(self)(np.linalg.inv(self.data))
+        return type(self)(self._gf, np.linalg.inv(self.data))
 
     @staticmethod
     def identity() -> PGL2:
-        return PGL2(GF(PGL2.order).Identity(2))
+        return self._gf.Identity(2)
 
 @dataclass(frozen=True)
 class EdgeEdge:
@@ -96,16 +97,21 @@ def morgenstern_generators(l, i) -> List[PGL2]:
     # We need to find some solutions, so we'll just exhaustively search for them
     # Find i \notin F_q s.t. i^2 + i \in F_q
     i_element = next(filter(lambda x: (x >= q) and (x**2 + x < q), Fqi.Elements()))
-    eps = i_element**2 + i_element
+    eps = Fq(i_element**2 + i_element)
 
     # Find solutions to g^2 + gd + d^2 epsilon = 1
-    pairs = list(filter(lambda g, d: (g**2 + g*d + d**2 * eps == 1), product(Fq.Elements(), Fq.Elements())))
+    def poly2(x):
+        g,d = x
+        return (g*g + g*d + d*d * eps == 1)
+    map_Fqi = lambda x: tuple(map(Fqi, x))
+    pairs = list(map(map_Fqi, filter(poly2, product(Fq.Elements(), Fq.Elements()))))
     assert len(pairs) == q+1
     x = Fqi.primitive_element # Is this right?
-    generators = [PGL2(Fqi([[1, (g+d*i_element)],[x*(g+d+d*i_element), 1]])) for (g,d) in pairs]
+    generators = [PGL2(Fqi, [[1, (g+d*i_element)],[x*(g+d+d*i_element), 1]]) for (g,d) in pairs]
     return generators
 
 def test_morgenstern_generators():
+    morgenstern_generators(2,4)
     pass
     # Do DFS using the generators from the left and from the right to make sure we get the number of elements we expect
     # Check a \in A implies a^-1 \in A
