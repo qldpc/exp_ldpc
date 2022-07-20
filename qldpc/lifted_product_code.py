@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from .homological_product_code import homological_product
+from .homological_product_code import homological_product, get_logicals
 import networkx as nx
 import numpy as np
 from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, num_cols, num_rows
 from .random_biregular_graph import random_biregular_graph
+from .random_code import random_check_matrix
 from .linalg import get_rank
 import scipy.sparse as sparse
 from itertools import product
 from collections import deque
 
-from typing import List
+from typing import List, Set, Tuple
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
@@ -35,11 +36,11 @@ class Group(ABC):
     
     def __pow__(self, n:int) -> Group:
         '''Return g**n where n is a positive integer'''
-        assert n is int
+        assert type(n) is int
         assert n >= 0
         r = self.identity()
         for _ in range(n):
-            r = r * self
+            r = r @ self
         return r
 
 # @dataclass(frozen=True)
@@ -98,7 +99,7 @@ class Zqm(Group):
         return type(self)(self.q, self.m, (self.data + other.data)%self.q)
 
     def inv(self) -> Zqm:
-        return type(self)(self.q, self.m, (q-self.data)%self.q)
+        return type(self)(self.q, self.m, (self.q-self.data)%self.q)
 
     def identity(self) -> Zqm:
         return type(self)(self.q, self.m, np.zeros(self.m, dtype=np.int_))
@@ -161,13 +162,17 @@ def test_morgenstern_generators():
     generators = morgenstern_generators(l,i)
     identity = generators[0].identity()
 
-    group_elements = _dfs_generators(lambda a,b: a@b, identity, generators)
+    group_elements = _dfs_generators(identity, generators)
     q = (2**l)**i
     assert len(group_elements) == (q-1)*q*(q+1)
     # Do DFS using the generators from the left and from the right to make sure we get the number of elements we expect
     # Check a \in A implies a^-1 \in A
 
-def _dfs_generators(traverse, root, generators):
+def _dfs_generators(root : Group, generators : List[Group], traverse=None) -> Set[Group]:
+    '''DFS traversal of the group from root using supplied generators acting from the left. A custom multiplication can be provided by passing traverse'''
+    if traverse is None:
+        traverse = lambda a,b: a@b
+    
     visited = set()
     frontier = deque([root])
     while True:
@@ -221,6 +226,12 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
         The right factor group action is from the right as an inverse
     '''
 
+    if check_complex is None:
+        check_complex = False
+
+    if compute_logicals is None:
+        compute_logicals = False
+    
     w = len(gen)
     assert w == h1.shape[1]
     assert w == h2.shape[1]
@@ -239,12 +250,12 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
         # Remembering the local system for E -> V
         # v1 is either 0 or 1 so we abuse notation and raise the shift to it
         x_check.extend(
-            VertexVertex((v1, r1), gen(e1)**v1 * g, (v2, r2))
+            VertexVertex((v1, r1), gen[e1]**v1 @ g, (v2, r2))
             for r1 in h1_system for v1 in vertices if h1[r1,e1] != 0)
 
         # ExV -> ExE
         x_check.extend(
-            EdgeEdge(e1, g * gen(e2).inv()**v2, e2)
+            EdgeEdge(e1, g @ gen[e2].inv()**v2, e2)
             for e2 in edges if h2[r2,e2] != 0)
 
         x_supports[EdgeVertex(e1,g,(v2,r2))] = x_check
@@ -253,64 +264,64 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
     q_supports = dict()
     for (e1, g, e2) in product(edges, group, edges):
         support = deque()
-        support.extend( VertexEdge((v1, r1), gen(e1)**v1 *g, e2)
-            for r1 in h1_system if h1[h1_system, e1] != 0 for v1 in vertices)
+        support.extend( VertexEdge((v1, r1), gen[e1]**v1 @ g, e2)
+            for r1 in h1_system if h1[r1, e1] != 0 for v1 in vertices)
 
         q_supports[EdgeEdge(e1,g,e2)] = support
 
     for (v1, r1, g, v2, r2) in product(vertices, h1_system, group, vertices, h2_system):
         support = deque()
-        support.extend( VertexEdge((v1, r1), g*gen(e2).inv()**v2, e2) for e2 in edges if h2[r2,e2] != 0)
+        support.extend( VertexEdge((v1, r1), g @ gen[e2].inv()**v2, e2) for e2 in edges if h2[r2,e2] != 0)
         
         q_supports[VertexVertex((v1, r1), g, (v2, r2))] = support
 
     # Create indices for everything
-    swap = lambda : (x[1],x[0])
+    swap = lambda x: (x[1],x[0])
     x_check_indices = dict(map(swap, enumerate(x_supports.keys())))
     qubit_indices = dict(map(swap, enumerate(q_supports.keys())))
-    z_check_indices = dict(map(swap, enumerate(((v1, r1), g, e2) for (v1, r1, g, r2) in product(vertices, h1_system, group, edges))))
+    z_check_indices = dict(map(swap, enumerate(VertexEdge((v1, r1), g, e2) for (v1, r1, g, e2) in product(vertices, h1_system, group, edges))))
 
     def coo_entries(coords):
         I = [x[0] for x in coords]
         J = [x[1] for x in coords]
-        return (1, (I,J))
+        return (np.ones_like(I), (I,J))
     
     # Create boundary maps
     partial_2 = sparse.coo_matrix(
-        coo_entries((qubit_indices(qubit), x_check_indices(x_check))
-            for (x_check, x_check_support) in x_supports.items() for qubit in x_check_supp),
-        shape=(len(qubit_indices), len(x_check_indices))).to_csr()
+        coo_entries([(qubit_indices[qubit], x_check_indices[x_check])
+                     for (x_check, x_check_support) in x_supports.items() for qubit in x_check_support]),
+        shape=(len(qubit_indices), len(x_check_indices))).tocsr()
     partial_1 = sparse.coo_matrix(
-        coo_entries((z_check_indices(z_check), qubit_indices(qubit))
-            for (qubit, qubit_support) in q_supports.items() for z_check in qubit_support),
-        shape=(len(z_check_indices), len(qubit_indices))).to_csr()
+        coo_entries([(z_check_indices[z_check], qubit_indices[qubit])
+                     for (qubit, qubit_support) in q_supports.items() for z_check in qubit_support]),
+        shape=(len(z_check_indices), len(qubit_indices))).tocsr()
 
     # Check complex and compute logical operators
     if check_complex:
         assert np.all((partial_1 @ partial_2).data % 2 == 0)
 
-    if compute_logicals is None:
-        compute_logicals = False
-    logicals = get_logicals(partial_1, partial_2, compute_logicals)
+    logicals = get_logicals(partial_1, partial_2, compute_logicals, check_complex)
 
-    # C2 dimension
-    assert partial_2.shape[1] == partial_A.shape[1]*partial_B.shape[1]
-    # C1 dimension
-    assert partial_1.shape[1] == partial_A.shape[0]*partial_B.shape[1] + partial_A.shape[1]*partial_B.shape[0]
+    # dimensions match
     assert partial_1.shape[1] == partial_2.shape[0]
-    # C0 dimension
-    assert partial_1.shape[0] == partial_A.shape[0]*partial_B.shape[0]
-
-    assert len(x_logicals) == len(z_logicals)
+    assert len(logicals[0]) == len(logicals[1])
 
     # Check number of logicals + number of checks == number of qubits
     if compute_logicals:
-        assert len(x_logicals) + partial_2.shape[1] + partial_1.shape[0] == partial_2.shape[0]
+        assert len(logicals[0]) + partial_2.shape[1] + partial_1.shape[0] == partial_2.shape[0]
 
     return ((partial_2.tocsc().astype(np.uint8), partial_1.tocsr().astype(np.uint8), num_cols(partial_1)), logicals)
 
 
-def test_lifted_product_code():
-    pass
+def test_lifted_product_code_cyclic():
+    # Parameters from Higgot and Breuckmann
+    w = 14
+    generators = random_abelian_generators(22, 1, w, seed=42)
+    group = _dfs_generators(generators[0].identity(), generators)
+    r1 = 5
+    r2 = 7
+    h1 = random_check_matrix(r1, w)
+    h2 = random_check_matrix(r2, w)
+    checks, logicals = lifted_product_code(group, generators, h1, h2, check_complex = True, compute_logicals = True)
 
 

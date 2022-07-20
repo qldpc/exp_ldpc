@@ -36,7 +36,7 @@ def compute_logical_pairs(z_logicals : GF2, x_logicals : GF2) -> GF2:
 
     return z_logicals    
 
-def get_logicals(partial_1 : sparse.spmatrix, partial_2 : sparse.spmatrix, compute_logicals) -> QuantumCodeLogicals:
+def get_logicals(partial_1 : sparse.spmatrix, partial_2 : sparse.spmatrix, compute_logicals, check_complex) -> QuantumCodeLogicals:
     x_logicals = np.zeros((0,partial_1.shape[1]), dtype=np.int8)
     z_logicals = np.zeros((0,partial_1.shape[1]), dtype=np.int8)
     if compute_logicals:
@@ -68,6 +68,9 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     '''
     if check_complex is None:
         check_complex = False
+        
+    if compute_logicals is None:
+        compute_logicals = False
 
     # D^A x I + I x D^B : A_1 x B_1 -> A_0 x B_1 + A_1 x B_0
     partial_2 = sparse.vstack([
@@ -85,9 +88,7 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     if check_complex:
         assert np.all((partial_1 @ partial_2).data % 2 == 0)
 
-    if compute_logicals is None:
-        compute_logicals = False
-    logicals = get_logicals(partial_1, partial_2, compute_logicals)
+    logicals = get_logicals(partial_1, partial_2, compute_logicals, check_complex)
 
     # C2 dimension
     assert partial_2.shape[1] == partial_A.shape[1]*partial_B.shape[1]
