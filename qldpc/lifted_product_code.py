@@ -44,6 +44,7 @@ class Group(ABC):
 
 # @dataclass(frozen=True)
 class GL2(Group):
+    '''GL(2,q)'''
     _gf : FieldArray
     data : FieldArray
 
@@ -72,31 +73,60 @@ class GL2(Group):
         return repr(self.data)
     
 class PGL2(GL2):
+    '''PGL(2,q) WIP. The quotient still needs to be implemented'''
     pass
+
+class Zqm(Group):
+    '''The abelian group Z_q^m'''
+    q : int
+    m : int
+    data : FieldArray
+
+    def __init__(self, q : int, m : int, data : np.array) -> None:
+        super().__init__()
+        self.q = q
+        self.m = m
+        assert data.shape == (m,)
+        assert np.all(data >= 0)
+        assert np.all(data < q)
+        assert np.issubdtype(data.dtype, int)
+        self.data = data.astype(np.int_)
+        self.data.flags.writeable = False
+
+    def __matmul__(self, other: Zqm) -> Zqm:
+        assert self.q == other.q
+        return type(self)(self.q, self.m, (self.data + other.data)%self.q)
+
+    def inv(self) -> Zqm:
+        return type(self)(self.q, self.m, (q-self.data)%self.q)
+
+    def identity(self) -> Zqm:
+        return type(self)(self.q, self.m, np.zeros(self.m, dtype=np.int_))
+
+    def __hash__(self):
+        return hash((self.m, self.q, self.data.tobytes()))
+
+    def __eq__(self, other):
+        return (self.m == self.m) and (self.q == self.q)  and np.all(self.data == other.data)
+
+    def __repr__(self):
+        return repr(self.data)
     
-@dataclass(frozen=True)
-class EdgeEdge:
-    e: int
-    g: Group
-    f: int
+def random_abelian_generators(q, m, k, seed=None):
+    '''Construct k generators (not necessarily complete or independent) at random for Z_q^m'''
+    rng = np.random.default_rng(seed)
+    # Rows of this matrix are desired generators wrt standard generators of Z_q^m
+    generator_matrix = rng.integers(low=0, high=q, size=(k,m))
+    return [Zqm(q, m, generator_matrix[i,:]) for i in range(k)]
 
-@dataclass(frozen=True)
-class VertexVertex:
-    u: (int, int)
-    g: Group
-    v: (int, int)
-
-@dataclass(frozen=True)
-class EdgeVertex:
-    e: int
-    g: Group
-    v: (int, int)
-
-@dataclass(frozen=True)
-class VertexEdge:
-    v: (int, int)
-    g: Group
-    e: int
+def test_random_abelian_generators():
+    q = 3
+    m = 4
+    k = 5
+    generators = random_abelian_generators(q,m,k, seed=42)
+    group = _dfs_generators(lambda a,b: a@b, generators[0].identity(), generators)
+    assert len(group) == q**m
+    
 
 def morgenstern_generators(l, i) -> List[PGL2]:
     '''Construct the Morgenstern generators for PGL(2,q^i) with q = 2^l
@@ -125,6 +155,18 @@ def morgenstern_generators(l, i) -> List[PGL2]:
     generators = [PGL2(Fqi, [[1, (g+d*i_element)],[x*(g+d+d*i_element), 1]]) for (g,d) in pairs]
     return generators
 
+def test_morgenstern_generators():
+    l = 1
+    i = 2
+    generators = morgenstern_generators(l,i)
+    identity = generators[0].identity()
+
+    group_elements = _dfs_generators(lambda a,b: a@b, identity, generators)
+    q = (2**l)**i
+    assert len(group_elements) == (q-1)*q*(q+1)
+    # Do DFS using the generators from the left and from the right to make sure we get the number of elements we expect
+    # Check a \in A implies a^-1 \in A
+
 def _dfs_generators(traverse, root, generators):
     visited = set()
     frontier = deque([root])
@@ -143,19 +185,31 @@ def _dfs_generators(traverse, root, generators):
             
     return visited
 
-def test_morgenstern_generators():
-    l = 1
-    i = 2
-    generators = morgenstern_generators(l,i)
-    identity = generators[0].identity()
+@dataclass(frozen=True)
+class EdgeEdge:
+    e: int
+    g: Group
+    f: int
 
-    group_elements = _dfs_generators(lambda a,b: a@b, identity, generators)
-    q = (2**l)**i
-    assert len(group_elements) == (q-1)*q*(q+1)
-    # Do DFS using the generators from the left and from the right to make sure we get the number of elements we expect
-    # Check a \in A implies a^-1 \in A
+@dataclass(frozen=True)
+class VertexVertex:
+    u: (int, int)
+    g: Group
+    v: (int, int)
 
+@dataclass(frozen=True)
+class EdgeVertex:
+    e: int
+    g: Group
+    v: (int, int)
 
+@dataclass(frozen=True)
+class VertexEdge:
+    v: (int, int)
+    g: Group
+    e: int
+
+    
 def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_complex = None, compute_logicals = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     ''' group object must implement __mul__ and inv()
         
