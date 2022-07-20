@@ -10,6 +10,7 @@ from .linalg import get_rank
 import scipy.sparse as sparse
 from itertools import product
 from collections import deque
+import warnings
 
 from typing import List, Set, Tuple
 from dataclasses import dataclass
@@ -125,7 +126,7 @@ def test_random_abelian_generators():
     m = 4
     k = 5
     generators = random_abelian_generators(q,m,k, seed=42)
-    group = _dfs_generators(lambda a,b: a@b, generators[0].identity(), generators)
+    group = _dfs_generators(generators[0].identity(), generators)
     assert len(group) == q**m
     
 
@@ -226,6 +227,8 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
         The right factor group action is from the right as an inverse
     '''
 
+    warnings.warn('Lifted Product codes is experimental!')
+    
     if check_complex is None:
         check_complex = False
 
@@ -320,8 +323,8 @@ def test_lifted_product_code_cyclic():
     group = _dfs_generators(generators[0].identity(), generators)
     r1 = 5
     r2 = 7
-    h1 = random_check_matrix(r1, w)
-    h2 = random_check_matrix(r2, w)
+    h1 = random_check_matrix(r1, w, seed=43)
+    h2 = random_check_matrix(r2, w, seed=44)
     checks, logicals = lifted_product_code(group, generators, h1, h2, check_complex = True, compute_logicals = True)
 
 

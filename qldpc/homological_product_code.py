@@ -98,10 +98,10 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     # C0 dimension
     assert partial_1.shape[0] == partial_A.shape[0]*partial_B.shape[0]
 
-    assert len(x_logicals) == len(z_logicals)
+    assert len(logicals[0]) == len(logicals[1])
 
     # Check number of logicals + number of checks == number of qubits
     if compute_logicals:
-        assert len(x_logicals) + partial_2.shape[1] + partial_1.shape[0] == partial_2.shape[0]
+        assert len(logicals[0]) + partial_2.shape[1] + partial_1.shape[0] == partial_2.shape[0]
 
     return ((partial_2.tocsc().astype(np.uint8), partial_1.tocsr().astype(np.uint8), num_cols(partial_1)), logicals)
