@@ -12,7 +12,7 @@ from itertools import product
 from collections import deque
 import warnings
 
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Callable
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
@@ -50,19 +50,19 @@ class GL2(Group):
     _gf : FieldArray
     data : FieldArray
 
-    def __init__(self, gf : FieldArray, data) -> None:
+    def __init__(self, gf : FieldArray, data : FieldArray):
         super().__init__()
         self._gf = gf
         self.data = gf(data)
         self.data.flags.writeable = False
 
-    def __matmul__(self, other: PGL2) -> PGL2:
+    def __matmul__(self, other: GL2) -> GL2:
         return type(self)(self._gf, self.data @ other.data)
 
-    def inv(self) -> PGL2:
+    def inv(self) -> GL2:
         return type(self)(self._gf, np.linalg.inv(self.data))
 
-    def identity(self) -> PGL2:
+    def identity(self) -> GL2:
         return type(self)(self._gf, self._gf.Identity(2))
 
     def __hash__(self):
@@ -73,10 +73,33 @@ class GL2(Group):
 
     def __repr__(self):
         return repr(self.data)
-    
+
+
 class PGL2(GL2):
     '''PGL(2,q) WIP. The quotient still needs to be implemented'''
-    pass
+    def __init__(self, gf : FieldArray, data : FieldArray, canonicalized=None):
+        if canonicalized is None:
+            canonicalized = False
+        super().__init__(gf, data)
+        # Create canonicalized matrix
+        if not canonicalized:
+            canonical_form = self.canonicalize()
+            self.data = canonical_form.data
+    
+    def canonicalize(self) -> PGL2:
+        '''Obtain a canonical representative of the element of PGL inside the coset of GL.
+        We do this by forcing the top left entry to be 1. If it is zero then we force the top right element to be 1'''
+        scaling = np.reciprocal(self.data[0,0] if self.data[0,0] != 0 else self.data[0,1])
+        return type(self)(self._gf, self.data*scaling, canonicalized=True)
+
+    def __matmul__(self, other: PGL2) -> PGL2:
+        return type(self)(self._gf, super().__matmul__(other).data)
+
+    def inv(self) -> PGL2:
+        return type(self)(self._gf, super().inv().data)
+
+    def identity(self) -> PGL2:
+        return type(self)(self._gf, self._gf.Identity(2), canonicalized=True)
 
 class Zqm(Group):
     '''The abelian group Z_q^m'''
