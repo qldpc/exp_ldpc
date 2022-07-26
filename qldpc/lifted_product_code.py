@@ -166,7 +166,7 @@ def morgenstern_generators(l, i) -> List[PGL2]:
 
     # We need to find some solutions, so we'll just exhaustively search for them
     # Find i \notin F_q s.t. i^2 + i \in F_q
-    i_element = next(filter(lambda x: (x >= q) and (x**2 + x < q), Fqi.Elements()))
+    i_element = next(filter(lambda x: (x >= q) and (x**2 + x < q), Fqi.elements))
     eps = Fq(i_element**2 + i_element)
 
     # Find solutions to g^2 + gd + d^2 epsilon = 1
@@ -174,7 +174,7 @@ def morgenstern_generators(l, i) -> List[PGL2]:
         g,d = x
         return (g*g + g*d + d*d * eps == 1)
     map_Fqi = lambda x: tuple(map(Fqi, x))
-    pairs = list(map(map_Fqi, filter(poly2, product(Fq.Elements(), Fq.Elements()))))
+    pairs = list(map(map_Fqi, filter(poly2, product(Fq.elements, Fq.elements))))
     assert len(pairs) == q+1
     x = Fqi.primitive_element # Is this right?
     generators = [PGL2(Fqi, [[1, (g+d*i_element)],[x*(g+d+d*i_element), 1]]) for (g,d) in pairs]
