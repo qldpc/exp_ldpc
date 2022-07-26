@@ -2,9 +2,11 @@ from multiprocessing.sharedctypes import Value
 import networkx as nx
 from networkx.algorithms import bipartite
 import scipy.sparse as sparse
-from typing import Callable, Iterable, Tuple, Dict, List
+from typing import Callable, Iterable, Tuple, Dict, List, Deque
 from .edge_coloring import edge_color_bipartite
 from .qecc_util import num_rows, QuantumCodeChecks, QuantumCodeLogicals
+import itertools
+from collections import deque
 import re
 import numpy as np
 
@@ -75,6 +77,7 @@ measurement_gates = ['M', 'MZ', 'MX', 'MY', 'MPP', 'MR', 'MRZ', 'MRX', 'MRY']
 measurement_line_pattern = re.compile(f'^(?:\\s*)({"|".join(measurement_gates)})((?:\\s*\\d+\\s*)+)$')
 
 def rewrite_measurement_noise(p : float, circuit_line : str) -> str:
+    '''Rewrite all measurements to contain noise with parameter p'''
     search_result = measurement_line_pattern.search(circuit_line)
     if search_result is None:
         return circuit_line
@@ -82,10 +85,30 @@ def rewrite_measurement_noise(p : float, circuit_line : str) -> str:
         (meas_type, targets) = search_result.group(1,2)
         return f'{meas_type}({p}){targets}'
 
-def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterable[int], ancilla_qubit_indices : Iterable[int], circuit : Iterable[str]) -> List[str]:
-    noisy_circuit = [rewrite_measurement_noise(pm, line) for line in circuit]
-    noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(str(i) for i in data_qubit_indices)}')
-    noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(str(i) for i in ancilla_qubit_indices)}')
+def circuit_ticks(circuit : Iterable[str]) -> Deque[Deque[str]]:
+    '''Returns a list of subcircuits separated by a TICK'''
+    subcircuits = deque()
+    for k, g in itertools.groupby(circuit, lambda x: x.strip().upper() == 'TICK'):
+        if k != True:
+            subcircuits.append(deque(g))
+    return subcircuits
+
+def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterable[int], _ancilla_qubit_indices : Iterable[int], circuit : Iterable[str]) -> Deque[str]:
+    '''Apply depolarizing noise to data qubits with rate p in any timestep where measurements take place. Also flip measurements with probability pm'''
+    noisy_circuit = deque()
+    for timestep in circuit_ticks(circuit):
+        try:
+            # Look for a measurement in this timestep
+            next(filter(lambda line: measurement_line_pattern.search(line) is not None, timestep))
+            # Add depolarizing noise
+            noisy_circuit.extend(rewrite_measurement_noise(pm, line) for line in timestep)
+            noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(str(i) for i in data_qubit_indices)}')
+        except StopIteration:
+            # Identity if no measurement
+            noisy_circuit.extend(timestep)
+        noisy_circuit.append('TICK')
+    # Remove the last TICK
+    noisy_circuit.pop()
     return noisy_circuit
 
 def unique_targets(circuit : str):
@@ -147,3 +170,24 @@ def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], c
     unique_targets('\n'.join(circuit))
     return (circuit, meas_result, data_result)
 
+
+def test_noise_rewrite():
+    circuit = [
+        'RX 0 1 2',
+        'TICK',
+        'CZ 0 1',
+        'TICK',
+        'MX 0 2',
+        'TICK',
+        'TICK',
+        'MX 0',
+    ]
+
+    rewritten_circuit = depolarizing_noise_model(0.1, 0.2, [1], [0,2], circuit)
+
+    # Golden test for now
+    print(rewritten_circuit)
+    assert rewritten_circuit[4] == 'MX(0.2) 0 2'
+    assert rewritten_circuit[5] == 'DEPOLARIZE1(0.1) 1'
+    assert rewritten_circuit[7] == 'MX(0.2) 0'
+    assert rewritten_circuit[8] == 'DEPOLARIZE1(0.1) 1'
