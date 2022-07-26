@@ -101,8 +101,8 @@ def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterabl
             # Look for a measurement in this timestep
             next(filter(lambda line: measurement_line_pattern.search(line) is not None, timestep))
             # Add depolarizing noise
-            noisy_circuit.extend(rewrite_measurement_noise(pm, line) for line in timestep)
             noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(str(i) for i in data_qubit_indices)}')
+            noisy_circuit.extend(rewrite_measurement_noise(pm, line) for line in timestep)
         except StopIteration:
             # Identity if no measurement
             noisy_circuit.extend(timestep)
