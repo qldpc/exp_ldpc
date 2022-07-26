@@ -327,15 +327,11 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
     if check_complex:
         assert np.all((partial_1 @ partial_2).data % 2 == 0)
 
-    logicals = get_logicals(partial_1, partial_2, compute_logicals, check_complex)
+    logicals = get_logicals(partial_1, partial_2, compute_logicals=compute_logicals, check_complex=check_complex)
 
     # dimensions match
     assert partial_1.shape[1] == partial_2.shape[0]
     assert len(logicals[0]) == len(logicals[1])
-
-    # Check number of logicals + number of checks == number of qubits
-    if compute_logicals:
-        assert len(logicals[0]) + partial_2.shape[1] + partial_1.shape[0] == partial_2.shape[0]
 
     return ((partial_2.tocsc().astype(np.uint8), partial_1.tocsr().astype(np.uint8), num_cols(partial_1)), logicals)
 

@@ -53,6 +53,8 @@ def get_logicals(partial_1 : sparse.spmatrix, partial_2 : sparse.spmatrix, compu
                 
             for l in z_logicals:
                 assert np.all((partial_2.T @ l) % 2 == 0)
+
+            assert len(x_logicals) + np.linalg.matrix_rank(partial_1_dense) + np.linalg.matrix_rank(partial_2_dense) == partial_1.shape[1]
             
     logicals = (
         [x_logicals[i,:] for i in range(x_logicals.shape[0])],
@@ -99,9 +101,5 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     assert partial_1.shape[0] == partial_A.shape[0]*partial_B.shape[0]
 
     assert len(logicals[0]) == len(logicals[1])
-
-    # Check number of logicals + number of checks == number of qubits
-    if compute_logicals:
-        assert len(logicals[0]) + partial_2.shape[1] + partial_1.shape[0] == partial_2.shape[0]
 
     return ((partial_2.tocsc().astype(np.uint8), partial_1.tocsr().astype(np.uint8), num_cols(partial_1)), logicals)
