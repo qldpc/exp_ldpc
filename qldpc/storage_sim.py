@@ -57,7 +57,7 @@ def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[List[int], List[i
         circuit.extend(f'CX {x_check_ancillas[check]} {target}' for (check, target) in round.items())
         circuit.append('TICK') # --------
     # Measure
-    circuit.append(f'MX {x_check_ancilla_str}')
+    circuit.append(f'MRX {x_check_ancilla_str}')
     
     # Init Z check ancillas in parallel with X check measurements
     circuit.append(f'RX {z_check_ancilla_str}')
@@ -67,7 +67,7 @@ def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[List[int], List[i
         circuit.extend(f'CZ {z_check_ancillas[check]} {target}' for (check, target) in round.items())
         circuit.append('TICK') # --------
 
-    circuit.append(f'MX {z_check_ancilla_str}')
+    circuit.append(f'MRX {z_check_ancilla_str}')
 
     # Leave off the final tick so we can interleave this element
     # circuit.append('TICK')  # --------
@@ -111,8 +111,21 @@ def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterabl
     noisy_circuit.pop()
     return noisy_circuit
 
+noise_channels = (
+    'CORRELATED_ERROR',
+    'DEPOLARIZE1',
+    'DEPOLARIZE2',
+    'ELSE_CORRELATED_ERROR',
+    'PAULI_CHANNEL_1',
+    'PAULI_CHANNEL_2',
+    'X_ERROR',
+    'Y_ERROR',
+    'Z_ERROR',
+)
+
 def unique_targets(circuit : str):
-    '''Ensure that a qubit only appears once per timestep'''
+    '''Ensure that a qubit only appears once per timestep. TODO: check only the targets of gates'''
+    
     def try_int(x):
         try:
             return int(x)
@@ -124,11 +137,17 @@ def unique_targets(circuit : str):
         unique_targets = frozenset(targets)
         assert len(targets) == len(unique_targets)
 
+    # A qubit index appears a second time in the noise annotation so we need to remove them to check that all gate targets are unique
+    def discard_noise(circuit : str):
+        return '\n'.join(s for s in circuit.split('\n') if not s.startswith(noise_channels))
+
     for timestep, timestep_circuit in enumerate(circuit.split('TICK')):
-        unique_targets_timestep(timestep_circuit)
+        unique_targets_timestep(discard_noise(timestep_circuit))
 
 # TODO: We will rewrite the perfect circuit to insert the appropriate fault locations noise model
 def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], checks : QuantumCodeChecks, use_x_logicals = None) -> Tuple[str, Callable[[int, bool, list], list], Callable[[list], list]]:
+    '''Construct a simulation where a logical 0 is prepared stored for rounds number of QEC cycles then transversally read out
+    use_x_logicals: prepare a |+> and read out in the X basis'''
     if use_x_logicals is None:
         use_x_logicals = False
 
@@ -143,11 +162,13 @@ def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], c
     # Prepare logical zero
     # We could optimize this by directly measuring the checks but it's a small cost
     circuit.append(f'R{reset_meas_basis} {" ".join(str(i) for i in data_qubit_indices)}')
+    circuit.append('TICK')
 
     # Do QEC
     for _ in range(rounds):
         circuit.extend(syndrome_extraction_circuit)
-    
+
+        
     # Read out data qubits
     circuit.append(f'M{reset_meas_basis} {" ".join(str(i) for i in data_qubit_indices)}')
 
