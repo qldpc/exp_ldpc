@@ -4,6 +4,7 @@ import numpy as np
 from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, num_cols, num_rows
 from .random_biregular_graph import random_biregular_graph
 from .linalg import get_rank
+import warnings
 
 def biregular_hpg(num_data : int, data_degree : int, check_degree : int, seed=None, graph_multiedge_retries=None, compute_logicals=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     ''' Constructs a hypergraph product code defined by a single (data_degree, check_degree)-regular bipartite graph
@@ -14,8 +15,11 @@ def biregular_hpg(num_data : int, data_degree : int, check_degree : int, seed=No
 
     num_checks = (num_data * data_degree)//check_degree
     tanner_graph = random_biregular_graph(num_checks, num_data, data_degree, check_degree, seed=seed, graph_multiedge_retries=graph_multiedge_retries)
-    
-    boundary_map = nx.bipartite.biadjacency_matrix(tanner_graph, row_order=[v for v in tanner_graph.nodes if tanner_graph.nodes[v]['bipartite'] == 0]).astype(int)
+
+    # Some behavior here will change with networkx 3.0
+    with warnings.catch_warnings():
+        warnings.simplefilter(action='ignore', category=FutureWarning)
+        boundary_map = nx.bipartite.biadjacency_matrix(tanner_graph, row_order=[v for v in tanner_graph.nodes if tanner_graph.nodes[v]['bipartite'] == 0]).astype(int)
     coboundary_map = boundary_map.transpose()
 
     ((partial_2, partial_1, num_qubits), (x_logicals, z_logicals, _)) = homological_product(boundary_map, coboundary_map, check_complex=True, compute_logicals=compute_logicals)
