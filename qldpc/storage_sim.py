@@ -143,18 +143,16 @@ def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], c
     # Prepare logical zero
     # We could optimize this by directly measuring the checks but it's a small cost
     circuit.append(f'R{reset_meas_basis} {" ".join(str(i) for i in data_qubit_indices)}')
-    circuit.extend(syndrome_extraction_circuit)
 
-    # Do noisy QEC
-    noisy_syndrome_extraction_circuit = noise_model(data_qubit_indices, x_check_indices+z_check_indices, syndrome_extraction_circuit)
+    # Do QEC
     for _ in range(rounds):
-        circuit.extend(noisy_syndrome_extraction_circuit)
+        circuit.extend(syndrome_extraction_circuit)
     
-    # Perfect QEC round
-    circuit.extend(syndrome_extraction_circuit)
-
     # Read out data qubits
     circuit.append(f'M{reset_meas_basis} {" ".join(str(i) for i in data_qubit_indices)}')
+
+    # Rewrite circuit with noise model
+    circuit = noise_model(data_qubit_indices, x_check_indices+z_check_indices, circuit)
 
     def meas_result(round_index, get_x_checks, measurement_vector, *_, x_check_count=x_check_count, z_check_count=z_check_count):
         meas_round_offset = (x_check_count + z_check_count) * round_index
