@@ -185,7 +185,8 @@ def test_morgenstern_generators():
     i = 2
     generators = morgenstern_generators(l,i)
     identity = generators[0].identity()
-
+    assert len(generators) == 2**l + 1
+    
     group_elements = _dfs_generators(identity, generators)
     q = (2**l)**i
     assert len(group_elements) == (q-1)*q*(q+1)
@@ -344,10 +345,24 @@ def test_lifted_product_code_cyclic():
     w = 14
     generators = random_abelian_generators(22, 1, w, seed=42)
     group = _dfs_generators(generators[0].identity(), generators)
-    r1 = 5
-    r2 = 7
+    r = 5
+    r1, r2 = (r,r)
     h1 = random_check_matrix(r1, w, seed=43)
     h2 = random_check_matrix(r2, w, seed=44)
     checks, logicals = lifted_product_code(group, generators, h1, h2, check_complex = True, compute_logicals = True)
 
+def test_lifted_product_code_pgl2():
+    l = 1
+    i = 2
+    # The local code length is probably too short here
+    # TODO: Combine with a second set of generators
+    generators = morgenstern_generators(l, i)
+    group = _dfs_generators(generators[0].identity(), generators)
+    w = len(generators)
 
+    r = 5
+    r1, r2 = (r,r)
+    h1 = random_check_matrix(r1, w, seed=43)
+    h2 = random_check_matrix(r2, w, seed=44)
+    checks, logicals = lifted_product_code(group, generators, h1, h2, check_complex = True, compute_logicals = True)
+    
