@@ -335,30 +335,51 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
 
     return ((partial_2.tocsc().astype(np.uint8), partial_1.tocsr().astype(np.uint8), num_cols(partial_1)), logicals)
 
+def _lifted_product_code_wrapper(generators, r, compute_logicals = None, r2 = None, seed = None, check_complex = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+    '''Utility function to reuse code between various LP code constructions'''
+    assert r > 0
+    r1 = r
+    if r2 is None:
+        r2 = r1
+
+    if compute_logicals is None:
+        compute_logicals = True
+
+    if check_complex is None:
+        check_complex = False
+
+    w = len(generators)
+    group = _dfs_generators(generators[0].identity(), generators)
+    h1 = random_check_matrix(r1, w, seed=seed+1 if seed is not None else None)
+    h2 = random_check_matrix(r2, w, seed=seed+2 if seed is not None else None)
+    return lifted_product_code(group, generators, h1, h2, check_complex = check_complex, compute_logicals = compute_logicals)
+
+def lifted_product_code_cyclic(q, m, w, r, compute_logicals = None, r2 = None, seed = None, check_complex = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+    '''Construct a lifted product code with w generators picked at random for Z_q^m. 
+    The local systems of the left and right factors contains r constraints.
+    If r2 is supplied then one factor in the lifted product will have r constraints and the other will have r2 constraints.
+    The seed for each step will be derived from the passed seed if provided.
+    '''
+    assert q > 0
+    assert m > 0
+    assert w > 0
+    
+    generators = random_abelian_generators(q, m, w, seed=seed)
+    return _lifted_product_code_wrapper(generators, r, compute_logicals=compute_logicals, r2=r2, seed=seed, check_complex=check_complex)
+
+def lifted_product_code_pgl2(l, i, r, *args, **kwargs):
+    '''Construct a lifted product code using the Morgenstern generators for PGL(2, (2^l)^i).
+    Seed lifted_product_code_cyclic for other parameters.
+    '''
+    generators = morgenstern_generators(l, i)
+    return _lifted_product_code_wrapper(generators, r, *args, **kwargs)
 
 def test_lifted_product_code_cyclic():
     # Parameters from Higgot and Breuckmann
-    w = 14
-    generators = random_abelian_generators(22, 1, w, seed=42)
-    group = _dfs_generators(generators[0].identity(), generators)
-    r = 5
-    r1, r2 = (r,r)
-    h1 = random_check_matrix(r1, w, seed=43)
-    h2 = random_check_matrix(r2, w, seed=44)
-    checks, logicals = lifted_product_code(group, generators, h1, h2, check_complex = True, compute_logicals = True)
+    checks, logicals = lifted_product_code_cyclic(q=22, m=1, w=14, r=5, compute_logicals=True, seed=42, check_complex=True)
 
 def test_lifted_product_code_pgl2():
-    l = 1
-    i = 2
     # The local code length is probably too short here
     # TODO: Combine with a second set of generators
-    generators = morgenstern_generators(l, i)
-    group = _dfs_generators(generators[0].identity(), generators)
-    w = len(generators)
-
-    r = 5
-    r1, r2 = (r,r)
-    h1 = random_check_matrix(r1, w, seed=43)
-    h2 = random_check_matrix(r2, w, seed=44)
-    checks, logicals = lifted_product_code(group, generators, h1, h2, check_complex = True, compute_logicals = True)
+    checks, logicals = lifted_product_code_pgl2(1, 2, 5, compute_logicals=True, seed=42, check_complex=True)
     
