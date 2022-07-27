@@ -1,7 +1,7 @@
 [project]
 name = "qldpc"
 dependencies = [
-"galois=0.0.31",
+"galois==0.0.31",
 "pandas>=1.4",
 "numpy>=1.22",
 "scipy>=1.8",
