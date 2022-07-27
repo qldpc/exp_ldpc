@@ -88,9 +88,17 @@ def rewrite_measurement_noise(p : float, circuit_line : str) -> str:
 def circuit_ticks(circuit : Iterable[str]) -> Deque[Deque[str]]:
     '''Returns a list of subcircuits separated by a TICK'''
     subcircuits = deque()
-    for k, g in itertools.groupby(circuit, lambda x: x.strip().upper() == 'TICK'):
-        if k != True:
-            subcircuits.append(deque(g))
+    subcircuits.append(deque())
+    circuit_iter = iter(circuit)
+    while True:
+        try:
+            line = next(circuit_iter)
+            subcircuits[-1].append(line)
+            if line.strip().upper() == 'TICK':
+                subcircuits.append(deque())
+        except StopIteration:
+            break
+    print(subcircuits)
     return subcircuits
 
 def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterable[int], _ancilla_qubit_indices : Iterable[int], circuit : Iterable[str]) -> Deque[str]:
@@ -106,9 +114,7 @@ def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterabl
         except StopIteration:
             # Identity if no measurement
             noisy_circuit.extend(timestep)
-        noisy_circuit.append('TICK')
-    # Remove the last TICK
-    noisy_circuit.pop()
+      
     return noisy_circuit
 
 noise_channels = (
@@ -206,7 +212,8 @@ def test_noise_rewrite():
 
     # Golden test for now
     print(rewritten_circuit)
-    assert rewritten_circuit[4] == 'MX(0.2) 0 2'
-    assert rewritten_circuit[5] == 'DEPOLARIZE1(0.1) 1'
-    assert rewritten_circuit[7] == 'MX(0.2) 0'
+    assert rewritten_circuit[4] == 'DEPOLARIZE1(0.1) 1'
+    assert rewritten_circuit[5] == 'MX(0.2) 0 2'
     assert rewritten_circuit[8] == 'DEPOLARIZE1(0.1) 1'
+    assert rewritten_circuit[9] == 'MX(0.2) 0'
+
