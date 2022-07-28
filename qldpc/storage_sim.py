@@ -5,7 +5,8 @@ import scipy.sparse as sparse
 from typing import Callable, Iterable, Tuple, Dict, List, Deque
 from .edge_coloring import edge_color_bipartite
 from .qecc_util import num_rows, QuantumCodeChecks, QuantumCodeLogicals
-import itertools
+from .code_examples import random_test_hpg
+from itertools import chain
 from collections import deque
 import re
 import numpy as np
@@ -56,7 +57,7 @@ def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[List[int], List[i
     for round in x_check_schedule:
         circuit.extend(f'CX {x_check_ancillas[check]} {target}' for (check, target) in round.items())
         circuit.append('TICK') # --------
-    # Measure
+    # Measurep
     circuit.append(f'MRX {x_check_ancilla_str}')
     
     # Init Z check ancillas in parallel with X check measurements
@@ -98,7 +99,6 @@ def circuit_ticks(circuit : Iterable[str]) -> Deque[Deque[str]]:
                 subcircuits.append(deque())
         except StopIteration:
             break
-    print(subcircuits)
     return subcircuits
 
 def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterable[int], _ancilla_qubit_indices : Iterable[int], circuit : Iterable[str]) -> Deque[str]:
@@ -161,6 +161,11 @@ def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], c
 
     (data_qubit_indices, x_check_indices, z_check_indices, syndrome_extraction_circuit) = build_perfect_circuit(checks)
 
+    # Ensure the indices are contiguous since we will assume this later
+    assert all(x_check_indices[i+1] == x_check_indices[i] + 1 for i in range(len(x_check_indices)-1))
+    assert all(z_check_indices[i+1] == z_check_indices[i] + 1 for i in range(len(z_check_indices)-1))
+    assert z_check_indices[0] == x_check_indices[-1]+1
+    
     x_check_count = len(x_check_indices)
     z_check_count = len(z_check_indices)
 
@@ -211,9 +216,37 @@ def test_noise_rewrite():
     rewritten_circuit = depolarizing_noise_model(0.1, 0.2, [1], [0,2], circuit)
 
     # Golden test for now
-    print(rewritten_circuit)
     assert rewritten_circuit[4] == 'DEPOLARIZE1(0.1) 1'
     assert rewritten_circuit[5] == 'MX(0.2) 0 2'
     assert rewritten_circuit[8] == 'DEPOLARIZE1(0.1) 1'
     assert rewritten_circuit[9] == 'MX(0.2) 0'
+
+def test_ancilla_targets():
+    # Reconstruct the checks from the syndrome extraction circuit and verify they match the code
+    checks, _ = random_test_hpg(compute_logicals=False)
+    x_checks, z_checks, _ = checks
+    
+    data_qubit_idx, x_ancilla_idx, z_ancilla_idx, circuit = build_perfect_circuit(checks)
+
+    x_ancilla_idx = frozenset(x_ancilla_idx)
+    measurement_order = deque(map(lambda x: int(x), chain(*[s.split()[1:] for s in circuit if s.startswith(('MX', 'MRX'))])))
+
+    # Find all the targets of CZ/CX
+    CX_targets = {i:set() for i in x_ancilla_idx}
+    CZ_targets = {i:set() for i in z_ancilla_idx}
+    for s in circuit:
+        if s.startswith('CX'):
+            _, control, target = s.split()
+            CX_targets[int(control)].add(int(target))
+        if s.startswith('CZ'):
+            _, control, target = s.split()
+            CZ_targets[int(control)].add(int(target))
+
+    # Verify the CX/CZ targets match the check supports
+    assert len(measurement_order) == x_checks.shape[0] + z_checks.shape[0]
+    for (i,m) in enumerate(measurement_order):
+        if m in x_ancilla_idx:
+            assert CX_targets[m] == set(x_checks[i,:].nonzero()[1])
+        else:
+            assert CZ_targets[m] == set(z_checks[i-x_checks.shape[0],:].nonzero()[1])
 
