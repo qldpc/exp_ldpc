@@ -68,10 +68,10 @@ def write_check_generators(stream : IOBase, checks : QuantumCodeChecks):
             stream.write(f'{col_list} {check_type}\n')
 
 def test_check_io():
-    from .code_examples import d3_rotated_surface_code, random_test_hpg
+    from .code_examples import d3_rotated_surface_code, random_test_hgp
     from io import StringIO
 
-    for checks in [d3_rotated_surface_code(), random_test_hpg()[0]]:
+    for checks in [d3_rotated_surface_code(), random_test_hgp()[0]]:
         # Write the code out
         test_buffer = StringIO()
         write_check_generators(test_buffer, checks)

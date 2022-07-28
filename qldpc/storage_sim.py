@@ -5,7 +5,7 @@ import scipy.sparse as sparse
 from typing import Callable, Iterable, Tuple, Dict, List, Deque
 from .edge_coloring import edge_color_bipartite
 from .qecc_util import num_rows, QuantumCodeChecks, QuantumCodeLogicals
-from .code_examples import random_test_hpg
+from .code_examples import random_test_hgp
 from itertools import chain
 from collections import deque
 import re
@@ -223,7 +223,7 @@ def test_noise_rewrite():
 
 def test_ancilla_targets():
     # Reconstruct the checks from the syndrome extraction circuit and verify they match the code
-    checks, _ = random_test_hpg(compute_logicals=False)
+    checks, _ = random_test_hgp(compute_logicals=False)
     
     data_qubit_idx, x_ancilla_idx, z_ancilla_idx, circuit = build_perfect_circuit(checks)
 

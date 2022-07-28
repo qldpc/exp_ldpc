@@ -6,7 +6,7 @@ from .random_biregular_graph import random_biregular_graph
 from .linalg import get_rank
 import warnings
 
-def biregular_hpg(num_data : int, data_degree : int, check_degree : int, check_complex=None, seed=None, graph_multiedge_retries=None, compute_logicals=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+def biregular_hgp(num_data : int, data_degree : int, check_degree : int, check_complex=None, seed=None, graph_multiedge_retries=None, compute_logicals=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     ''' Constructs a hypergraph product code defined by a single (data_degree, check_degree)-regular bipartite graph
         In the classical code, the check nodes represent a basis of 1-chains and the data nodes represent a basis of 0-chains.
         The boundary map from 1-chains to 0-chains gives the neighborhood of data nodes.
@@ -29,13 +29,13 @@ def biregular_hpg(num_data : int, data_degree : int, check_degree : int, check_c
     assert checks.num_qubits == (num_data**2 + num_checks**2)
     return (checks, logicals)
 
-def random_test_hpg(compute_logicals=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+def random_test_hgp(compute_logicals=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     if compute_logicals is None:
         compute_logicals=True
-    return biregular_hpg(36, 3, 4, seed=42, compute_logicals=compute_logicals)
+    return biregular_hgp(36, 3, 4, seed=42, compute_logicals=compute_logicals)
 
-def test_smoketest_biregular_hpg():
-    (checks, logicals) = random_test_hpg()
+def test_smoketest_biregular_hgp():
+    (checks, logicals) = random_test_hgp()
 
     # Checks commute
     assert np.all((checks.x @ checks.z.transpose()).data%2 == 0)
