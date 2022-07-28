@@ -327,13 +327,14 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
     if check_complex:
         assert np.all((partial_1 @ partial_2).data % 2 == 0)
 
-    logicals = get_logicals(partial_1, partial_2, compute_logicals=compute_logicals, check_complex=check_complex)
+    checks = QuantumCodeChecks(partial_2.T.astype(np.int32), partial_1.astype(np.int32), partial_1.shape[1])
+    logicals = get_logicals(checks, compute_logicals=compute_logicals, check_complex=check_complex)
 
     # dimensions match
-    assert partial_1.shape[1] == partial_2.shape[0]
-    assert len(logicals[0]) == len(logicals[1])
+    assert checks.x.shape[1] == checks.z.shape[1]
+    assert len(logicals.x) == len(logicals.z)
 
-    return ((partial_2.tocsc().astype(np.uint8), partial_1.tocsr().astype(np.uint8), num_cols(partial_1)), logicals)
+    return (checks, logicals)
 
 def _lifted_product_code_wrapper(generators, r, compute_logicals = None, r2 = None, seed = None, check_complex = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     '''Utility function to reuse code between various LP code constructions'''

@@ -22,14 +22,12 @@ def biregular_hpg(num_data : int, data_degree : int, check_degree : int, check_c
         boundary_map = nx.bipartite.biadjacency_matrix(tanner_graph, row_order=[v for v in tanner_graph.nodes if tanner_graph.nodes[v]['bipartite'] == 0]).astype(int)
     coboundary_map = boundary_map.transpose()
 
-    ((partial_2, partial_1, num_qubits), (x_logicals, z_logicals, _)) = homological_product(boundary_map, coboundary_map, check_complex=check_complex, compute_logicals=compute_logicals)
+    checks, logicals = homological_product(boundary_map, coboundary_map, check_complex=check_complex, compute_logicals=compute_logicals)
 
-    (x_checks, z_checks) = (partial_2.transpose().tocsr(), partial_1.tocsr())
-
-    assert len(x_logicals) == len(z_logicals)
-    assert x_checks.shape == z_checks.shape
-    assert num_qubits == (num_data**2 + num_checks**2)
-    return ((x_checks, z_checks, num_qubits), (x_logicals, z_logicals, num_qubits))
+    assert len(logicals.x) == len(logicals.z)
+    assert checks.x.shape == checks.z.shape
+    assert checks.num_qubits == (num_data**2 + num_checks**2)
+    return (checks, logicals)
 
 def random_test_hpg(compute_logicals=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     if compute_logicals is None:
@@ -37,33 +35,30 @@ def random_test_hpg(compute_logicals=None) -> (QuantumCodeChecks, QuantumCodeLog
     return biregular_hpg(36, 3, 4, seed=42, compute_logicals=compute_logicals)
 
 def test_smoketest_biregular_hpg():
-    ((x_checks, z_checks, _), (x_logicals, z_logicals, _)) = random_test_hpg()
+    (checks, logicals) = random_test_hpg()
 
-    z_logicals = np.vstack(z_logicals)
-    x_logicals = np.vstack(x_logicals)
-    
     # Checks commute
-    assert np.all((x_checks @ z_checks.transpose()).data%2 == 0)
+    assert np.all((checks.x @ checks.z.transpose()).data%2 == 0)
 
     # Z logicals commute with X checks
-    assert np.all((x_checks @ z_logicals.transpose())%2 == 0)
+    assert np.all((checks.x @ logicals.z.transpose())%2 == 0)
     # X logicals commute with Z checks
-    assert np.all((z_checks @ x_logicals.transpose())%2 == 0)
+    assert np.all((checks.z @ logicals.x.transpose())%2 == 0)
 
-    assert get_rank(x_logicals) == x_logicals.shape[0]
-    assert get_rank(z_logicals) == z_logicals.shape[0]
+    assert get_rank(logicals.x) == logicals.x.shape[0]
+    assert get_rank(logicals.z) == logicals.z.shape[0]
     # X and Z logicals come in pairs
-    assert np.all(z_logicals @ x_logicals.transpose() == np.identity(z_logicals.shape[0]))
+    assert np.all(logicals.z @ logicals.x.transpose() == np.identity(logicals.z.shape[0]))
 
     # In general the checks may not be independent ex. toric code
-    x_checks = x_checks.todense()
-    z_checks = z_checks.todense()
+    x_checks_dense = checks.x.todense()
+    z_checks_dense = checks.z.todense()
     
-    x_checks_rank = get_rank(x_checks)
-    z_checks_rank = get_rank(z_checks)
+    x_checks_rank = get_rank(x_checks_dense)
+    z_checks_rank = get_rank(z_checks_dense)
 
     # X logicals are non-trivial
-    assert get_rank(np.vstack([x_checks, x_logicals])) == x_checks_rank + x_logicals.shape[0]
+    assert get_rank(np.vstack([x_checks_dense, logicals.x])) == x_checks_rank + logicals.z.shape[0]
 
     # Z logicals are non-trivial
-    assert get_rank(np.vstack([z_checks, z_logicals])) == z_checks_rank + z_logicals.shape[0]
+    assert get_rank(np.vstack([z_checks_dense, logicals.z])) == z_checks_rank + logicals.z.shape[0]

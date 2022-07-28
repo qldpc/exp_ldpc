@@ -34,8 +34,8 @@ def order_measurements(checks : QuantumCodeChecks) -> Tuple[int, MeasurementOrde
         return (len(data_nodes), len(check_nodes), meas_order)
 
 
-    (x_data_nodes, x_check_nodes, xorder) = build_meas_order_basis(checks[0])
-    (z_data_nodes, z_check_nodes, zorder) = build_meas_order_basis(checks[1])
+    (x_data_nodes, x_check_nodes, xorder) = build_meas_order_basis(checks.x)
+    (z_data_nodes, z_check_nodes, zorder) = build_meas_order_basis(checks.z)
     assert x_data_nodes == z_data_nodes
     return (x_data_nodes, (x_check_nodes, xorder), (z_check_nodes, zorder) )
 
@@ -224,7 +224,6 @@ def test_noise_rewrite():
 def test_ancilla_targets():
     # Reconstruct the checks from the syndrome extraction circuit and verify they match the code
     checks, _ = random_test_hpg(compute_logicals=False)
-    x_checks, z_checks, _ = checks
     
     data_qubit_idx, x_ancilla_idx, z_ancilla_idx, circuit = build_perfect_circuit(checks)
 
@@ -243,10 +242,10 @@ def test_ancilla_targets():
             CZ_targets[int(control)].add(int(target))
 
     # Verify the CX/CZ targets match the check supports
-    assert len(measurement_order) == x_checks.shape[0] + z_checks.shape[0]
+    assert len(measurement_order) == checks.x.shape[0] + checks.z.shape[0]
     for (i,m) in enumerate(measurement_order):
         if m in x_ancilla_idx:
-            assert CX_targets[m] == set(x_checks[i,:].nonzero()[1])
+            assert CX_targets[m] == set(checks.x[i,:].nonzero()[1])
         else:
-            assert CZ_targets[m] == set(z_checks[i-x_checks.shape[0],:].nonzero()[1])
+            assert CZ_targets[m] == set(checks.z[i-checks.x.shape[0],:].nonzero()[1])
 

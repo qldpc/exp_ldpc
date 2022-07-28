@@ -47,28 +47,22 @@ def read_check_generators(stream : IOBase, validate_stabilizer_code = None) -> Q
     
     x_checks = make_check_matrix(x_checks, qubit_count)
     z_checks = make_check_matrix(z_checks, qubit_count)
+    checks = QuantumCodeChecks(x_checks, z_checks, qubit_count)
 
     if validate_stabilizer_code is True:
-        if not np.all((x_checks @ z_checks.transpose()).data%2 == 0):
+        if not np.all((checks.x @ checks.z.transpose()).data%2 == 0):
             raise RuntimeError(f'X and Z checks do not generate an abelian group')
 
-    return (x_checks, z_checks, qubit_count)
+    return checks
 
 def write_check_generators(stream : IOBase, checks : QuantumCodeChecks):
-    (x_checks, z_checks, num_qubits) = checks
 
-    # This is sometimes convenient to use this routine to save logicals
-    if type(x_checks) is list:
-        x_checks = np.vstack(x_checks)
-    if type(z_checks) is list:
-        z_checks = np.vstack(z_checks)
-    
-    assert num_cols(x_checks) == num_cols(z_checks)
-    assert num_cols(x_checks) == num_qubits
+    assert num_cols(checks.x) == num_cols(checks.z)
+    assert num_cols(checks.x) == checks.num_qubits
     # Header
-    stream.write(f'qecc {num_qubits} {num_rows(x_checks)} {num_rows(z_checks)}\n')
+    stream.write(f'qecc {checks.num_qubits} {num_rows(checks.x)} {num_rows(checks.z)}\n')
     # Check generators for each type
-    for (check_type, check_matrix) in (('X', x_checks), ('Z', z_checks)):
+    for (check_type, check_matrix) in (('X', checks.x), ('Z', checks.z)):
         for row_index in range(num_rows(check_matrix)):
             col_list = " ".join(str(col) for col in sparse.find(check_matrix[row_index, :])[1])
             stream.write(f'{col_list} {check_type}\n')
@@ -87,8 +81,8 @@ def test_check_io():
         new_checks = read_check_generators(test_buffer, validate_stabilizer_code=True)
 
         # Should be identity
-        assert (new_checks[0] != checks[0]).nnz == 0
-        assert (new_checks[1] != checks[1]).nnz == 0
-        assert new_checks[2] == checks[2]
+        assert (new_checks.x != checks.x).nnz == 0
+        assert (new_checks.z != checks.z).nnz == 0
+        assert new_checks.num_qubits == checks.num_qubits
 
 

@@ -36,7 +36,11 @@ def compute_logical_pairs(z_logicals : GF2, x_logicals : GF2) -> GF2:
 
     return z_logicals    
 
-def get_logicals(partial_1 : sparse.spmatrix, partial_2 : sparse.spmatrix, compute_logicals, check_complex) -> QuantumCodeLogicals:
+def get_logicals(checks : QuantumCodeChecks , compute_logicals, check_complex) -> QuantumCodeLogicals:
+    # This was originally written in the chain complex notation, but now requires explicit X/Z notation
+    partial_2 = checks.x.T
+    partial_1 = checks.z
+    
     x_logicals = np.zeros((0,partial_1.shape[1]), dtype=np.int8)
     z_logicals = np.zeros((0,partial_1.shape[1]), dtype=np.int8)
     if compute_logicals:
@@ -56,11 +60,7 @@ def get_logicals(partial_1 : sparse.spmatrix, partial_2 : sparse.spmatrix, compu
 
             assert len(x_logicals) + np.linalg.matrix_rank(partial_1_dense) + np.linalg.matrix_rank(partial_2_dense) == partial_1.shape[1]
             
-    logicals = (
-        [x_logicals[i,:] for i in range(x_logicals.shape[0])],
-        [z_logicals[i,:] for i in range(z_logicals.shape[0])],
-        len(x_logicals))
-    return logicals
+    return QuantumCodeLogicals(x_logicals.astype(np.int32), z_logicals.astype(np.int32), len(x_logicals))
 
     
 
@@ -90,7 +90,8 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     if check_complex:
         assert np.all((partial_1 @ partial_2).data % 2 == 0)
 
-    logicals = get_logicals(partial_1, partial_2, compute_logicals, check_complex)
+    checks = QuantumCodeChecks(partial_2.tocsc().transpose().astype(np.int32), partial_1.tocsr().astype(np.int32), num_cols(partial_1))
+    logicals = get_logicals(checks, compute_logicals, check_complex)
 
     # C2 dimension
     assert partial_2.shape[1] == partial_A.shape[1]*partial_B.shape[1]
@@ -100,6 +101,6 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     # C0 dimension
     assert partial_1.shape[0] == partial_A.shape[0]*partial_B.shape[0]
 
-    assert len(logicals[0]) == len(logicals[1])
+    assert logicals.x.shape[0] == logicals.z.shape[0]
 
-    return ((partial_2.tocsc().astype(np.uint8), partial_1.tocsr().astype(np.uint8), num_cols(partial_1)), logicals)
+    return (checks, logicals)
