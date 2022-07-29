@@ -348,12 +348,16 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
     partial_2 = sparse.coo_matrix(
         coo_entries([(qubit_indices[qubit], x_check_indices[x_check])
                      for (x_check, x_check_support) in x_supports.items() for qubit in x_check_support]),
-        shape=(len(qubit_indices), len(x_check_indices))).tocsr()
+        shape=(len(qubit_indices), len(x_check_indices)), dtype=np.int32).tocsr()
     partial_1 = sparse.coo_matrix(
         coo_entries([(z_check_indices[z_check], qubit_indices[qubit])
                      for (qubit, qubit_support) in q_supports.items() for z_check in qubit_support]),
-        shape=(len(z_check_indices), len(qubit_indices))).tocsr()
+        shape=(len(z_check_indices), len(qubit_indices)), dtype=np.int32).tocsr()
 
+    # In case of redundancies
+    partial_2.data = partial_2.data%2
+    partial_1.data = partial_1.data%2
+    
     # Check complex and compute logical operators
     if check_complex:
         assert np.all((partial_1 @ partial_2).data % 2 == 0)
