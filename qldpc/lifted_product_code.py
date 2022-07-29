@@ -8,7 +8,7 @@ from .random_biregular_graph import random_biregular_graph
 from .random_code import random_check_matrix
 from .linalg import get_rank
 import scipy.sparse as sparse
-from itertools import product
+from itertools import product, chain
 from collections import deque
 import warnings
 
@@ -137,13 +137,28 @@ class Zqm(Group):
     def __repr__(self):
         return repr(self.data)
     
-def random_abelian_generators(q, m, k, seed=None):
-    '''Construct k generators (not necessarily complete or independent) at random for Z_q^m'''
+def random_abelian_generators(q, m, k, symmetric=None, seed=None):
+    '''Construct k generators (not necessarily complete or independent) at random for Z_q^m
+    If symmetric is true, construct k/2 generators and add their inverses'''
     rng = np.random.default_rng(seed)
     # Rows of this matrix are desired generators wrt standard generators of Z_q^m
+    if symmetric is None:
+        symmetric = False
+        
+    # q = 2 is already symmetric
+    symmetrize = symmetric and q != 2
+        
+    if symmetrize:
+        if k%2 != 0:
+            raise ValueError('Number of generators must be even when the set is symmetrized and q /= 2')
+        k = k//2
+        
     generator_matrix = rng.integers(low=0, high=q, size=(k,m))
-    return [Zqm(q, m, generator_matrix[i,:]) for i in range(k)]
-
+    generators = [Zqm(q, m, generator_matrix[i,:]) for i in range(k)]
+    if symmetrize:
+        generators = list(chain(*[[g, g.inv()] for g in generators]))
+    return generators
+    
 def test_random_abelian_generators():
     q = 3
     m = 4
@@ -151,7 +166,6 @@ def test_random_abelian_generators():
     generators = random_abelian_generators(q,m,k, seed=42)
     group = _dfs_generators(generators[0].identity(), generators)
     assert len(group) == q**m
-    
 
 def morgenstern_generators(l, i) -> List[PGL2]:
     '''Construct the Morgenstern generators for PGL(2,q^i) with q = 2^l
@@ -240,15 +254,23 @@ class VertexEdge:
     e: int
 
     
-def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_complex = None, compute_logicals = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
-    ''' group object must implement __mul__ and inv()
+def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_complex = None, compute_logicals = None, double_cover = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+    '''
+    group object must implement __mul__ and inv()
         
-        E x V -> ExE + VxV -> V x E
-        h1 is the local system for the left factor
-        h2 is the local system for the right factor
+    E x V -> ExE + VxV -> V x E
+    h1 is the local system for the left factor
+    h2 is the local system for the right factor
         
-        The left factor group action is from the left as normal
-        The right factor group action is from the right as an inverse
+    The left factor group action is from the left
+    The right factor group action is from the right
+
+    The generator set will be extended to contain inverses in the construction
+    
+    double_cover=False uses the Bouquet graph as the base graph so the Tanner code is on the Cayley graph
+    If double_cover is false we must also have that forall a \\in S, a /= a^-1
+    
+    double_cover=True uses a multigraph with w edges and 2 vertices so the Tanner code is on the double cover of the Cayley graph
     '''
 
     warnings.warn('Lifted Product codes is experimental!')
@@ -258,12 +280,19 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
 
     if compute_logicals is None:
         compute_logicals = False
-    
+
+    if double_cover is None:
+        double_cover = True
+
     w = len(gen)
     assert w == h1.shape[1]
     assert w == h2.shape[1]
 
-    vertices = [0,1]
+    vertices = [0,1] if double_cover else [0]
+    edge_boundaries = [(0,0), (1,1)] if double_cover else [(0,0), (0,1)]
+    # we need to track orientation more carefully without the double cover
+    vertex_coboundary = lambda v: [(e,v) for e in edges] if double_cover else [(e,o) for e in edges for o in (0,1)]
+    
     edges = list(range(w))
 
     h1_system = list(range(h1.shape[0]))
@@ -277,28 +306,30 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
         # Remembering the local system for E -> V
         # v1 is either 0 or 1 so we abuse notation and raise the shift to it
         x_check.extend(
-            VertexVertex((v1, r1), gen[e1]**v1 @ g, (v2, r2))
-            for r1 in h1_system for v1 in vertices if h1[r1,e1] != 0)
+            VertexVertex((v1, r1), gen[e1]**orient @ g, (v2, r2))
+            for r1 in h1_system for v1, orient in edge_boundaries if h1[r1,e1] != 0)
 
         # ExV -> ExE
         x_check.extend(
-            EdgeEdge(e1, g @ gen[e2].inv()**v2, e2)
-            for e2 in edges if h2[r2,e2] != 0)
+            EdgeEdge(e1, g @ gen[e2].inv()**orient, e2)
+            for e2, orient in vertex_coboundary(v2) if h2[r2,e2] != 0)
 
         x_supports[EdgeVertex(e1,g,(v2,r2))] = x_check
     
     # Supports of each qubit within a Z check
     q_supports = dict()
+    # ExE -> VxE
     for (e1, g, e2) in product(edges, group, edges):
         support = deque()
-        support.extend( VertexEdge((v1, r1), gen[e1]**v1 @ g, e2)
-            for r1 in h1_system if h1[r1, e1] != 0 for v1 in vertices)
+        support.extend( VertexEdge((v1, r1), gen[e1]**orient @ g, e2)
+                        for r1 in h1_system if h1[r1, e1] != 0 for v1, orient in edge_boundaries)
 
         q_supports[EdgeEdge(e1,g,e2)] = support
 
+    # VxV -> VxE
     for (v1, r1, g, v2, r2) in product(vertices, h1_system, group, vertices, h2_system):
         support = deque()
-        support.extend( VertexEdge((v1, r1), g @ gen[e2].inv()**v2, e2) for e2 in edges if h2[r2,e2] != 0)
+        support.extend( VertexEdge((v1, r1), g @ gen[e2].inv()**orient, e2) for e2, orient in vertex_coboundary(v2) if h2[r2,e2] != 0)
         
         q_supports[VertexVertex((v1, r1), g, (v2, r2))] = support
 
@@ -336,7 +367,7 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
 
     return (checks, logicals)
 
-def _lifted_product_code_wrapper(generators, r, compute_logicals = None, r2 = None, seed = None, check_complex = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+def _lifted_product_code_wrapper(generators, r, compute_logicals, seed, check_complex, r2=None, double_cover=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     '''Utility function to reuse code between various LP code constructions'''
     assert r > 0
     r1 = r
@@ -353,9 +384,9 @@ def _lifted_product_code_wrapper(generators, r, compute_logicals = None, r2 = No
     group = _dfs_generators(generators[0].identity(), generators)
     h1 = random_check_matrix(r1, w, seed=seed+1 if seed is not None else None)
     h2 = random_check_matrix(r2, w, seed=seed+2 if seed is not None else None)
-    return lifted_product_code(group, generators, h1, h2, check_complex = check_complex, compute_logicals = compute_logicals)
+    return lifted_product_code(group, generators, h1, h2, check_complex = check_complex, compute_logicals = compute_logicals, double_cover=double_cover)
 
-def lifted_product_code_cyclic(q, m, w, r, compute_logicals = None, r2 = None, seed = None, check_complex = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+def lifted_product_code_cyclic(q, m, w, r, compute_logicals=None, r2=None, seed=None, check_complex=None, double_cover=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
     '''Construct a lifted product code with w generators picked at random for Z_q^m. 
     The local systems of the left and right factors contains r constraints.
     If r2 is supplied then one factor in the lifted product will have r constraints and the other will have r2 constraints.
@@ -364,9 +395,19 @@ def lifted_product_code_cyclic(q, m, w, r, compute_logicals = None, r2 = None, s
     assert q > 0
     assert m > 0
     assert w > 0
-    
+
+    if double_cover is None:
+        double_cover = False
+
+    if not double_cover:
+        if q == 2:
+            raise ValueError('Generators cannot be self inverse when not using the double cover')
+        if w % 2 != 0:
+            raise ValueError('Need an even degree for the Cayley graph when not using the double cover')
+        w = w // 2
+        
     generators = random_abelian_generators(q, m, w, seed=seed)
-    return _lifted_product_code_wrapper(generators, r, compute_logicals=compute_logicals, r2=r2, seed=seed, check_complex=check_complex)
+    return _lifted_product_code_wrapper(generators, r, compute_logicals=compute_logicals, r2=r2, seed=seed, check_complex=check_complex, double_cover=double_cover)
 
 def lifted_product_code_pgl2(l, i, r, *args, **kwargs):
     '''Construct a lifted product code using the Morgenstern generators for PGL(2, (2^l)^i).
@@ -377,8 +418,27 @@ def lifted_product_code_pgl2(l, i, r, *args, **kwargs):
 
 def test_lifted_product_code_cyclic():
     # Parameters from Higgot and Breuckmann
-    checks, logicals = lifted_product_code_cyclic(q=22, m=1, w=14, r=5, compute_logicals=True, seed=42, check_complex=True)
+    w = 14
+    r = 5
+    q = 22
+    m = 1
+    G = q**m
+    checks, logicals = lifted_product_code_cyclic(q=q, m=m, w=w, r=r, double_cover=True, compute_logicals=True, seed=42, check_complex=True)
+    assert checks.num_qubits == (w**2 + 4*r**2)*G
+    assert logicals.x.shape[0] >= checks.num_qubits - 2* (2*w*r*G)
 
+def test_lifted_product_code_cyclic_Bw():
+    # Don't use the double cover
+    # Parameters from Higgot and Breuckmann
+    w = 14
+    r = 5
+    q = 22
+    m = 1
+    G = q**m
+    checks, logicals = lifted_product_code_cyclic(q=q, m=m, w=w, r=r, double_cover=False, compute_logicals=True, seed=42, check_complex=True)
+    assert checks.num_qubits == (w**2//4 + r**2)*G
+    assert logicals.x.shape[0] >= checks.num_qubits - w*r*G
+    
 def test_lifted_product_code_pgl2():
     # The local code length is probably too short here
     # TODO: Combine with a second set of generators
