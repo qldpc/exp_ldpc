@@ -249,3 +249,8 @@ def test_ancilla_targets():
         else:
             assert CZ_targets[m] == set(checks.z[i-checks.x.shape[0],:].nonzero()[1])
 
+
+def smoketest_storage_sim():
+    noise_model = lambda *x: depolarizing_noise_model(p_ph, 0, *x)
+    checks, _ = random_test_hgp(compute_logicals=False)
+    qldpc.build_storage_simulation(3, noise_model, checks.x, use_x_logicals = False)
