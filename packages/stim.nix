@@ -32,6 +32,8 @@ pythonPackages.buildPythonPackage rec {
     homepage = "https://github.com/quantumlib/stim";
   };
 
+  enableParallelBuilding = true;
+
   # Tests require Cirq and networkx
   doCheck = false;
 }

@@ -28,6 +28,8 @@ pythonPackages.buildPythonPackage rec {
     pythonPackages.pytestCheckHook
   ];
 
+  enableParallelBuilding = true;
+
   meta = {
     description = "The galois library is a Python 3 package that extends NumPy arrays to operate over finite fields.";
     license = lib.licenses.mit;
