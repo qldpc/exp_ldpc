@@ -64,6 +64,11 @@ git clone https://github.com/qldpc/exp_ldpc.git
 sudo singularity build ldpc.sif exp_ldpc/ldpc.def
 ```
 
+## Alternate Installation (Nix)
+A nix package and flakes are provided:
+Use either `nix-shell` or `nix develop` to spawn a shell where the package is installed in the python interpreter. 
+Alternatively, use the python package overlay defined in `flake.nix` to build your own python environment.
+
 ## Generating a code and syndrome extraction circuit
 Try `python /scripts/generate_code_circuit.py --help` and `python /scripts/generate_code_circuit.py 4 3 12 --rounds 1 --save_code code.txt --save_circuit circuit.txt`
 to generate a (3,4) hypergraph product code on 225 qubits with 108 X and Z checks and 9 logicals.

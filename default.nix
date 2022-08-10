@@ -1,8 +1,8 @@
 { pkgs ? import <nixpkgs> {} }:
 let
-  pythonPackages = import ./packages;
+  pythonPackageOverlay = import ./packages; 
   python = pkgs.python39.override {
-    packageOverrides = pythonPackages;
+    packageOverrides = pythonPackageOverlay;
   };
 in 
   pkgs.mkShell {
