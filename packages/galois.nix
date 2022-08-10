@@ -37,5 +37,10 @@ pythonPackages.buildPythonPackage rec {
     homepage = "https://github.com/mhostetter/galois";
   };
 
-  doCheck = true;
+  postPatch = ''
+    substituteInPlace setup.cfg \
+    --replace "numpy >= 1.18.4, < 1.23" "numpy >= 1.18.4, < 1.24"
+  '';
+
+  doCheck = false;
 }
