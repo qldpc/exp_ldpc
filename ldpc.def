@@ -1,0 +1,33 @@
+Bootstrap: docker
+From: fedora:latest
+
+%runscript
+
+%environment
+export PATH=/usr/local/bin:$PATH
+source /base/python/bin/activate
+
+%files
+./exp_ldpc /base/scratch/exp_ldpc
+
+%post
+# ===== Packages from the repo ======
+dnf groupinstall -y "Development Tools"
+dnf install -y git wget boost boost-devel cmake cargo rustc
+dnf install -y python3 python3-devel
+
+# ===== build python venv =====
+mkdir -p /base
+python3 -m venv /base/python
+source /base/python/bin/activate
+
+pip install \
+numpy pandas scipy networkx matplotlib \
+stim pymatching
+
+pip install /base/scratch/exp_ldpc
+rm -r /base/scratch/exp_ldpc
+
+# ===== cleanup =====
+dnf clean all
+rm -rf /var/cache/yum

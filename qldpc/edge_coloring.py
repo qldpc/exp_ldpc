@@ -3,10 +3,19 @@ from networkx.algorithms import bipartite
 from collections import namedtuple
 from typing import List, Set
 import numpy as np
+from copy import copy
 
 def _canonicalize_edge(e):
     (u,v) = e[:2] # [:2] in case the graph is weighted
-    return (u,v) if u < v else (v,u)
+    (u,v) = (u,v) if u < v else (v,u)
+    return (u,v) + e[2:]
+
+def _edges_with_keys(G : nx.Graph):
+    try:
+        return G.edges(keys=True)
+    except TypeError:
+        return G.edges()
+
 
 def edge_color_bipartite(bipartite_graph : nx.Graph) -> List[Set[int]]:
     '''Given a bipartite graph, return an optimal edge coloring in time O(|VG||EG|).
@@ -25,7 +34,7 @@ def edge_color_bipartite(bipartite_graph : nx.Graph) -> List[Set[int]]:
     ColorSet = namedtuple('ColorSets', ['vertices', 'edges'])
     colorings = [ColorSet(set(), set()) for _ in range(graph_degree)]
 
-    for edge in G.edges():
+    for edge in _edges_with_keys(G):
         (u, v) = edge[:2]
         u_set = None
         try:
@@ -38,9 +47,15 @@ def edge_color_bipartite(bipartite_graph : nx.Graph) -> List[Set[int]]:
             # Compute an edge 2-coloring in the subgraph v_set \cup u_set
             # The new sets are the edge colors of this subgraph
 
+
+            def filter_edge(u,v,key=None):
+                # Reassemble the edge
+                edge = (u,v) if key is None else (u,v,key)
+                return _canonicalize_edge(edge) in u_set.edges or _canonicalize_edge(edge) in v_set.edges
+            
             uv_subgraph = nx.subgraph_view(G,
                 filter_node = lambda x: (x in u_set.vertices or x in v_set.vertices),
-                filter_edge = lambda u, v: (_canonicalize_edge((u,v)) in u_set.edges or _canonicalize_edge((u,v)) in v_set.edges))
+                filter_edge = filter_edge)
 
             # Fix edge coloring in u_set and v_set so we can add edge
             # We do this by following the chain of edges incident to v and swapping all the colors in this chain
@@ -81,13 +96,34 @@ def test_bipartite_edge_coloring():
         degree = np.random.randint(4, 20)
     
         test_graph = bipartite.generators.random_graph(n_nodes, m_nodes, degree/np.sqrt(n_nodes*m_nodes))
-        print(test_graph)
+        check_graph(test_graph)
 
+def test_bipartite_multigraph_edge_coloring():
+    for _ in range(100):
+        n_nodes = np.random.randint(10, 100)
+        m_nodes = np.random.randint(10, 100)
+
+        n_degree_sequence = np.random.randint(4, 20, size=n_nodes)
+        avg_m_edges = np.sum(n_degree_sequence)/m_nodes
+        m_degree_sequence = np.random.randint(int(np.maximum(0,avg_m_edges-4)), int(avg_m_edges+4), size=m_nodes)
+
+        # Dump all the excess edges on the last node
+        m_excess = np.sum(m_degree_sequence) - np.sum(n_degree_sequence)
+        if m_excess > 0:
+            n_degree_sequence[-1] += m_excess
+        else:
+            m_degree_sequence[-1] -= m_excess
+    
+        test_graph = bipartite.generators.configuration_model(n_degree_sequence, m_degree_sequence)
+        check_graph(test_graph)
+    
+
+def check_graph(test_graph):
         colored_sets = edge_color_bipartite(test_graph)
 
         assert(len(colored_sets) == max(map(lambda x: x[1], test_graph.degree())))
 
-        for edge in test_graph.edges():
+        for edge in _edges_with_keys(test_graph):
             # Each edge is colored exactly once
             assert sum(1 for coloring in colored_sets if _canonicalize_edge(edge) in coloring) == 1
         for node in test_graph.nodes():

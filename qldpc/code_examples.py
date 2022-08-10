@@ -1,4 +1,4 @@
-from .hypergraph_product_code import random_test_hpg
+from .hypergraph_product_code import random_test_hgp
 from .qecc_util import QuantumCodeChecks, make_check_matrix
 
 
@@ -17,4 +17,4 @@ def d3_rotated_surface_code() -> QuantumCodeChecks:
         [7,8],
     ]
     qubit_count = 9
-    return (make_check_matrix(x_checks, qubit_count), make_check_matrix(z_checks, qubit_count), qubit_count)
+    return QuantumCodeChecks(make_check_matrix(x_checks, qubit_count), make_check_matrix(z_checks, qubit_count), qubit_count)

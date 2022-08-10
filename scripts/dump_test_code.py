@@ -16,9 +16,9 @@ def non_zeros(x):
 if __name__ == '__main__':
     (checks, logicals) = biregular_hpg(12, 5, 6, seed=670235982)
     print('x_checks\n')
-    dump_checks(checks[0])
+    dump_checks(checks.x)
     print('z_checks\n')
-    dump_checks(checks[0])
+    dump_checks(checks.z)
     print(os.linesep)
     print('x_logicals')
     print(list_to_arr_literal((non_zeros(x) for x in logicals[0]), newline=True))
