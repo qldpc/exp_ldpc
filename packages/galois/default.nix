@@ -1,19 +1,25 @@
-{ pkgs
-, pythonPackages
+{ buildPythonPackage
+, fetchFromGitHub
+, pytestCheckHook
+, numpy
+, numba
+, typing-extensions
+, pytest
 }:
 
-pythonPackages.buildPythonPackage rec {
+buildPythonPackage rec {
   pname = "galois";
   version = "0.0.32";
+  format = "pyproject";
 
-  src = pkgs.fetchFromGitHub {
+  src = fetchFromGitHub {
     owner = "mhostetter";
     repo = "galois";
     rev = "bf1275a815fd21162198ce788633294ad97b4675";
     sha256 = "sha256-+cxRLrfqk3N9pWKCVsTxruZwMYZ5dQyKJRnrb8y+ECM=";
   };
 
-  propagatedBuildInputs = with pythonPackages; [
+  propagatedBuildInputs = [
     numpy
     numba
     typing-extensions
@@ -21,7 +27,7 @@ pythonPackages.buildPythonPackage rec {
   ];
 
   checkInputs = [
-    pythonPackages.pytestCheckHook
+    pytestCheckHook
   ];
 
   checkImport = [ "galois" ];
