@@ -16,6 +16,7 @@ pythonPackages.buildPythonPackage rec {
   };
 
   propagatedBuildInputs = with pythonPackages; [
+    numpy
     pybind11
     pytest
   ];
@@ -31,5 +32,6 @@ pythonPackages.buildPythonPackage rec {
     homepage = "https://github.com/quantumlib/stim";
   };
 
-  doCheck = true;
+  # Tests require Cirq and networkx
+  doCheck = false;
 }
