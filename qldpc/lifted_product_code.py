@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-from .homological_product_code import homological_product, get_logicals
-import networkx as nx
+from .homological_product_code import get_logicals
 import numpy as np
-from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, num_cols, num_rows
-from .random_biregular_graph import random_biregular_graph
+from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals
 from .random_code import random_check_matrix
-from .linalg import get_rank
 import scipy.sparse as sparse
 from itertools import product, chain
 from collections import deque
 import warnings
 
-from typing import List, Set, Tuple, Callable
+from typing import List, Set
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
@@ -159,14 +156,6 @@ def random_abelian_generators(q, m, k, symmetric=None, seed=None):
         generators = list(chain(*[[g, g.inv()] for g in generators]))
     return generators
     
-def test_random_abelian_generators():
-    q = 3
-    m = 4
-    k = 5
-    generators = random_abelian_generators(q,m,k, seed=42)
-    group = _dfs_generators(generators[0].identity(), generators)
-    assert len(group) == q**m
-
 def morgenstern_generators(l, i) -> List[PGL2]:
     '''Construct the Morgenstern generators for PGL(2,q^i) with q = 2^l
     This follows the overview in Dinur et al. (2021) arXiv:2111.04808
@@ -193,19 +182,6 @@ def morgenstern_generators(l, i) -> List[PGL2]:
     x = Fqi.primitive_element # Is this right?
     generators = [PGL2(Fqi, [[1, (g+d*i_element)],[x*(g+d+d*i_element), 1]]) for (g,d) in pairs]
     return generators
-
-def test_morgenstern_generators():
-    l = 1
-    i = 2
-    generators = morgenstern_generators(l,i)
-    identity = generators[0].identity()
-    assert len(generators) == 2**l + 1
-    
-    group_elements = _dfs_generators(identity, generators)
-    q = (2**l)**i
-    assert len(group_elements) == (q-1)*q*(q+1)
-    # Do DFS using the generators from the left and from the right to make sure we get the number of elements we expect
-    # Check a \in A implies a^-1 \in A
 
 def _dfs_generators(root : Group, generators : List[Group], traverse=None) -> Set[Group]:
     '''DFS traversal of the group from root using supplied generators acting from the left. A custom multiplication can be provided by passing traverse'''
@@ -419,32 +395,4 @@ def lifted_product_code_pgl2(l, i, r, *args, **kwargs):
     '''
     generators = morgenstern_generators(l, i)
     return _lifted_product_code_wrapper(generators, r, *args, **kwargs)
-
-def test_lifted_product_code_cyclic():
-    # Parameters from Higgot and Breuckmann
-    w = 14
-    r = 5
-    q = 22
-    m = 1
-    G = q**m
-    checks, logicals = lifted_product_code_cyclic(q=q, m=m, w=w, r=r, double_cover=True, compute_logicals=True, seed=42, check_complex=True)
-    assert checks.num_qubits == (w**2 + 4*r**2)*G
-    assert logicals.x.shape[0] >= checks.num_qubits - 2* (2*w*r*G)
-
-def test_lifted_product_code_cyclic_Bw():
-    # Don't use the double cover
-    # Parameters from Higgot and Breuckmann
-    w = 14
-    r = 5
-    q = 22
-    m = 1
-    G = q**m
-    checks, logicals = lifted_product_code_cyclic(q=q, m=m, w=w, r=r, double_cover=False, compute_logicals=True, seed=42, check_complex=True)
-    assert checks.num_qubits == (w**2//4 + r**2)*G
-    assert logicals.x.shape[0] >= checks.num_qubits - w*r*G
-    
-def test_lifted_product_code_pgl2():
-    # The local code length is probably too short here
-    # TODO: Combine with a second set of generators
-    checks, logicals = lifted_product_code_pgl2(1, 2, 5, compute_logicals=True, seed=42, check_complex=True)
     
