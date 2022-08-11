@@ -11,3 +11,7 @@ dependencies = [
 [build-system]
 requires = ["maturin>=0.13,<0.14"]
 build-backend = "maturin"
+
+[tool.maturin]
+# Require that Cargo.lock is up to date
+locked = true
