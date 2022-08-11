@@ -33,6 +33,8 @@ buildPythonPackage rec {
   ];
 
   checkInputs = [
-    # pytestCheckHook
+    pytestCheckHook
   ];
+  # Currently blows up due to numba
+  doCheck = false;
 }
