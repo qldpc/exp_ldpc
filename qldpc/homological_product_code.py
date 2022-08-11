@@ -1,9 +1,7 @@
 import scipy.sparse as sparse
-import networkx as nx
-import itertools
 import numpy as np
 from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, num_cols, num_rows, GF2
-from .linalg import get_rank, gf2_get_pivots
+from .linalg import gf2_get_pivots
 
 def compute_homology_reps(partial_2 : GF2, partial_1 : GF2, dual=False) -> GF2:
     '''Compute representatives of the homology group of the complex defined by partial_1 . partial_2 = 0'''
