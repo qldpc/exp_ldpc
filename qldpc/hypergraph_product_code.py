@@ -1,9 +1,7 @@
 from .homological_product_code import homological_product
 import networkx as nx
-import numpy as np
-from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, num_cols, num_rows
+from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals
 from .random_biregular_graph import random_biregular_graph, remove_short_cycles
-from .linalg import get_rank
 import warnings
 
 def biregular_hgp(num_data : int, data_degree : int, check_degree : int, check_complex=None, seed=None, graph_multiedge_retries=None, compute_logicals=None, girth_bound=None, girth_bound_patience=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
@@ -38,32 +36,3 @@ def random_test_hgp(compute_logicals=None) -> (QuantumCodeChecks, QuantumCodeLog
     if compute_logicals is None:
         compute_logicals=True
     return biregular_hgp(36, 3, 4, seed=42, compute_logicals=compute_logicals, girth_bound=4)
-
-def test_smoketest_biregular_hgp():
-    (checks, logicals) = random_test_hgp()
-
-    # Checks commute
-    assert np.all((checks.x @ checks.z.transpose()).data%2 == 0)
-
-    # Z logicals commute with X checks
-    assert np.all((checks.x @ logicals.z.transpose())%2 == 0)
-    # X logicals commute with Z checks
-    assert np.all((checks.z @ logicals.x.transpose())%2 == 0)
-
-    assert get_rank(logicals.x) == logicals.x.shape[0]
-    assert get_rank(logicals.z) == logicals.z.shape[0]
-    # X and Z logicals come in pairs
-    assert np.all(logicals.z @ logicals.x.transpose() == np.identity(logicals.z.shape[0]))
-
-    # In general the checks may not be independent ex. toric code
-    x_checks_dense = checks.x.todense()
-    z_checks_dense = checks.z.todense()
-    
-    x_checks_rank = get_rank(x_checks_dense)
-    z_checks_rank = get_rank(z_checks_dense)
-
-    # X logicals are non-trivial
-    assert get_rank(np.vstack([x_checks_dense, logicals.x])) == x_checks_rank + logicals.z.shape[0]
-
-    # Z logicals are non-trivial
-    assert get_rank(np.vstack([z_checks_dense, logicals.z])) == z_checks_rank + logicals.z.shape[0]
