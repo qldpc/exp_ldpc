@@ -27,7 +27,7 @@ def test_noise_rewrite():
 
 def test_ancilla_targets():
     # Reconstruct the checks from the syndrome extraction circuit and verify they match the code
-    checks, _ = random_test_hgp(compute_logicals=False)
+    checks = random_test_hgp(compute_logicals=False).checks
     
     data_qubit_idx, x_ancilla_idx, z_ancilla_idx, circuit = build_perfect_circuit(checks)
 

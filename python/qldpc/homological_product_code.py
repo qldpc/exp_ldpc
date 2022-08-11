@@ -1,6 +1,6 @@
 import scipy.sparse as sparse
 import numpy as np
-from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, num_cols, num_rows, GF2
+from .qecc_util import QuantumCode, QuantumCodeChecks, QuantumCodeLogicals, num_cols, GF2
 from .linalg import gf2_get_pivots
 
 def compute_homology_reps(partial_2 : GF2, partial_1 : GF2, dual=False) -> GF2:
@@ -62,7 +62,7 @@ def get_logicals(checks : QuantumCodeChecks , compute_logicals, check_complex) -
 
     
 
-def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix, check_complex = None, compute_logicals = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix, check_complex = None, compute_logicals = None) -> QuantumCode:
     '''Compute the homological product of two 2-complexes defined by their non-trivial boundary map
         Returns pair of boundary maps (partial_2, partial_1) of the total complex
     '''
@@ -101,4 +101,4 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
 
     assert logicals.x.shape[0] == logicals.z.shape[0]
 
-    return (checks, logicals)
+    return QuantumCode(checks, logicals)

@@ -18,6 +18,11 @@ class QuantumCodeLogicals:
     z : np.array
     num_qubits : int
 
+@dataclass
+class QuantumCode:
+    checks : QuantumCodeChecks
+    logicals : QuantumCodeLogicals
+
 def num_rows(a : np.array) -> int:
     assert(len(a.shape) == 2)
     return a.shape[0]

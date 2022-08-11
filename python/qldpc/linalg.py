@@ -1,5 +1,6 @@
 from .qecc_util import GF2
 import numpy as np
+from typing import List
 # from numba import njit
 
 # We use routines from galois now
@@ -89,7 +90,7 @@ import numpy as np
 #     return (D, S, T)
 
 
-def gf2_get_pivots(A : np.array) -> [int]:
+def gf2_get_pivots(A : np.array) -> List[int]:
     largest_index = (A!=0).argmax(axis=1)
     return np.extract(A[range(A.shape[0]), largest_index]!=0, largest_index)
 

@@ -29,7 +29,9 @@ def test_lifted_product_code_cyclic():
     q = 22
     m = 1
     G = q**m
-    checks, logicals = lifted_product_code_cyclic(q=q, m=m, w=w, r=r, double_cover=True, compute_logicals=True, seed=42, check_complex=True)
+    code = lifted_product_code_cyclic(q=q, m=m, w=w, r=r, double_cover=True, compute_logicals=True, seed=42, check_complex=True)
+    checks = code.checks
+    logicals = code.logicals
     assert checks.num_qubits == (w**2 + 4*r**2)*G
     assert logicals.x.shape[0] >= checks.num_qubits - 2* (2*w*r*G)
 
@@ -41,11 +43,13 @@ def test_lifted_product_code_cyclic_Bw():
     q = 22
     m = 1
     G = q**m
-    checks, logicals = lifted_product_code_cyclic(q=q, m=m, w=w, r=r, double_cover=False, compute_logicals=True, seed=42, check_complex=True)
+    code = lifted_product_code_cyclic(q=q, m=m, w=w, r=r, double_cover=False, compute_logicals=True, seed=42, check_complex=True)
+    checks = code.checks
+    logicals = code.logicals
     assert checks.num_qubits == (w**2//4 + r**2)*G
     assert logicals.x.shape[0] >= checks.num_qubits - w*r*G
     
 def test_lifted_product_code_pgl2():
     # The local code length is probably too short here
     # TODO: Combine with a second set of generators
-    checks, logicals = lifted_product_code_pgl2(1, 2, 5, compute_logicals=True, seed=42, check_complex=True)
+    lifted_product_code_pgl2(1, 2, 5, compute_logicals=True, seed=42, check_complex=True)

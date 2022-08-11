@@ -3,7 +3,9 @@ import numpy as np
 from qldpc.linalg import get_rank
 
 def test_smoketest_biregular_hgp():
-    (checks, logicals) = random_test_hgp()
+    code = random_test_hgp()
+    checks = code.checks
+    logicals = code.logicals
 
     # Checks commute
     assert np.all((checks.x @ checks.z.transpose()).data%2 == 0)

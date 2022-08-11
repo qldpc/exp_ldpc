@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from .homological_product_code import get_logicals
 import numpy as np
-from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals
+from .qecc_util import QuantumCode, QuantumCodeChecks
 from .random_code import random_check_matrix
 import scipy.sparse as sparse
 from itertools import product, chain
 from collections import deque
 import warnings
 
-from typing import List, Set
+from typing import List, Set, Tuple
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
@@ -213,24 +213,24 @@ class EdgeEdge:
 
 @dataclass(frozen=True)
 class VertexVertex:
-    u: (int, int)
+    u: Tuple[int, int]
     g: Group
-    v: (int, int)
+    v: Tuple[int, int]
 
 @dataclass(frozen=True)
 class EdgeVertex:
     e: int
     g: Group
-    v: (int, int)
+    v: Tuple[int, int]
 
 @dataclass(frozen=True)
 class VertexEdge:
-    v: (int, int)
+    v: Tuple[int, int]
     g: Group
     e: int
 
     
-def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_complex = None, compute_logicals = None, double_cover = None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_complex = None, compute_logicals = None, double_cover = None) -> QuantumCode:
     '''
     group object must implement __mul__ and inv()
         
@@ -345,9 +345,9 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
     assert checks.x.shape[1] == checks.z.shape[1]
     assert len(logicals.x) == len(logicals.z)
 
-    return (checks, logicals)
+    return QuantumCode(checks, logicals)
 
-def _lifted_product_code_wrapper(generators, r, compute_logicals, seed, check_complex, r2=None, double_cover=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+def _lifted_product_code_wrapper(generators, r, compute_logicals, seed, check_complex, r2=None, double_cover=None) -> QuantumCode:
     '''Utility function to reuse code between various LP code constructions'''
     assert r > 0
     r1 = r
@@ -366,7 +366,7 @@ def _lifted_product_code_wrapper(generators, r, compute_logicals, seed, check_co
     h2 = random_check_matrix(r2, w, seed=seed+2 if seed is not None else None)
     return lifted_product_code(group, generators, h1, h2, check_complex = check_complex, compute_logicals = compute_logicals, double_cover=double_cover)
 
-def lifted_product_code_cyclic(q, m, w, r, compute_logicals=None, r2=None, seed=None, check_complex=None, double_cover=None) -> (QuantumCodeChecks, QuantumCodeLogicals):
+def lifted_product_code_cyclic(q, m, w, r, compute_logicals=None, r2=None, seed=None, check_complex=None, double_cover=None) -> QuantumCode:
     '''Construct a lifted product code with w generators picked at random for Z_q^m. 
     The local systems of the left and right factors contains r constraints.
     If r2 is supplied then one factor in the lifted product will have r constraints and the other will have r2 constraints.
