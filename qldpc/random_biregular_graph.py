@@ -1,13 +1,12 @@
 import networkx as nx
 import numpy as np
 import itertools
-import pytest
 from typing import Tuple
 
-def canonicalize_edge(x : Tuple[int, int]) -> Tuple[int, int]:
+def _canonicalize_edge(x : Tuple[int, int]) -> Tuple[int, int]:
     return (x[0], x[1]) if x[0] < x[1] else (x[1], x[0])
 
-def canonicalize_edge_bipartite(graph : nx.Graph, x : Tuple[int, int]) -> Tuple[int, int]:
+def _canonicalize_edge_bipartite(graph : nx.Graph, x : Tuple[int, int]) -> Tuple[int, int]:
     return (x[0], x[1]) if graph.nodes[x[1]]['bipartite'] == 1 else (x[1], x[0])
 
 def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, check_degree : int, seed=None, graph_multiedge_retries=None) -> nx.Graph:
@@ -62,15 +61,15 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
         edge_list = list(tanner_graph.edges())
         swap_edges = rng.choice(edge_list, size=len(multiedge_list), replace=False)
         for (edge_a, edge_b) in zip(multiedge_list, swap_edges):
-            new_edge_a = canonicalize_edge((edge_a[0], edge_b[1]))
-            new_edge_b = canonicalize_edge((edge_b[0], edge_a[1]))
+            new_edge_a = _canonicalize_edge((edge_a[0], edge_b[1]))
+            new_edge_b = _canonicalize_edge((edge_b[0], edge_a[1]))
 
             # We can end up selecting an edge that's already in the multiedge_list
-            no_double_remove = canonicalize_edge(edge_b) not in edge_removal_list
+            no_double_remove = _canonicalize_edge(edge_b) not in edge_removal_list
             if no_double_remove:
 
-                edge_removal_list.append(canonicalize_edge(edge_a))
-                edge_removal_list.append(canonicalize_edge(edge_b))
+                edge_removal_list.append(_canonicalize_edge(edge_a))
+                edge_removal_list.append(_canonicalize_edge(edge_b))
 
                 edge_add_list.append(new_edge_a)
                 edge_add_list.append(new_edge_b)
@@ -79,9 +78,7 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
         for e in edge_removal_list:
             # Removes an arbitrary edge if there are multiple edges like e
             tanner_graph.remove_edge(*e, key=None)
-        tanner_graph.add_edges_from(edge_add_list)
-        
-        check_biregular(tanner_graph, data_degree, check_degree, False)
+        tanner_graph.add_edges_from(edge_add_list)        
     else:
         raise RuntimeError('Unable to remove multiedges from the graph')
 
@@ -89,7 +86,7 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
 
     return tanner_graph
 
-def bfs_girth(graph, node, max_depth : int):
+def _bfs_girth(graph, node, max_depth : int):
     '''Find a cycle of length up to max depth going through node via BFS'''
     try:
         return next(nx.all_simple_paths(graph, node, node, cutoff=max_depth))
@@ -104,16 +101,16 @@ def remove_short_cycles(graph : nx.Graph, girth_bound : int, seed=None, patience
 
     for _ in range(patience):
         for node in left_vertex_set:
-            path = bfs_girth(graph, node, max_depth=girth_bound)
+            path = _bfs_girth(graph, node, max_depth=girth_bound)
             if path is None:
                 continue
 
-            (u1, v1) = canonicalize_edge_bipartite(graph, path[2:])
+            (u1, v1) = _canonicalize_edge_bipartite(graph, path[2:])
             # Select new edge
             for _ in range(patience):
                 candidate_edge = graph.edges[rng.integers(num_edges)]
                 # Ensure we can swap while maintaining a graph
-                (u2, v2) = canonicalize_edge_bipartite(candidate_edge[:2])
+                (u2, v2) = _canonicalize_edge_bipartite(candidate_edge[:2])
                 # Check u2 not neighbor of v1
                 # Check u1 not neighbor of v2
                 if u2 not in graph.neighbors(v1) and u1 not in graph.neighbors(v2):
@@ -122,51 +119,3 @@ def remove_short_cycles(graph : nx.Graph, girth_bound : int, seed=None, patience
                     graph.remove_edge(u2, v2)
                     graph.add_edge(u1, v2)
                     graph.add_edge(u2, v1)
-
-def check_biregular(G, data_degree, check_degree, check_type=True):
-    if check_type is True:
-        assert type(G) is nx.Graph
-    # Consistency check
-    for (node, degree) in G.degree():
-        if G.nodes[node]['bipartite'] == 0:
-            assert degree == data_degree
-        else:
-            assert degree == check_degree
-
-def check_girth(G, girth_bound):
-    '''Check that the girth is strictly greater than girth_bound'''
-    for node in G.nodes:
-        assert bfs_girth(G, node, girth_bound) is None
-
-seeds = [
-    0x59824c5a, 0x9dca707a, 0xe0218aa8, 0x81da8035, 
-    0x63b16deb, 0x7dc89245, 0x1ab46afa, 0x5cc6d93e, 
-    0x6a550348, 0x97090396, 0x2a18366d, 0xcba46c36, 
-    0xa7984b05, 0x82ee5a86, 0xb6cbf54b, 0xce8b63a4,
-    ]
-
-graph_cases = (
-    [(27, 3, 4, s) for s in seeds]
-    + [(10, 5, 6, s) for s in seeds]
-    + [(21, 7, 8, s) for s in seeds]
-    + [(27, 9, 10, s) for s in seeds]
-    )
-
-@pytest.mark.parametrize("left_vertices,right_deg,left_deg,seed", graph_cases)
-def test_smoketest_random_biregular_graph(left_vertices, right_deg, left_deg, seed):
-    right_vertices = left_vertices*left_deg//right_deg
-    graph = random_biregular_graph(left_vertices, right_vertices, right_deg, left_deg, seed=seed)
-    check_biregular(graph, right_deg, left_deg)
-
-@pytest.mark.parametrize("seed", seeds)
-def test_remove_short_cycles(seed):
-    left_deg = 4
-    right_deg = 3
-    left_vertices = 51
-    right_vertices = left_vertices*left_deg//right_deg
-    graph = random_biregular_graph(left_vertices, right_vertices, right_deg, left_deg, seed=seed)
-
-    remove_short_cycles(graph, 4)
-    check_girth(graph, 4)
-
-    check_biregular(graph, right_deg, left_deg)
