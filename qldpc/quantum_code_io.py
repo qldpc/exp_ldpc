@@ -1,8 +1,7 @@
 from io import IOBase
-import scipy
 from scipy import sparse
 import numpy as np
-from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, make_check_matrix, num_rows, num_cols
+from .qecc_util import QuantumCodeChecks, make_check_matrix, num_rows, num_cols
 
 def read_check_generators(stream : IOBase, validate_stabilizer_code = None) -> QuantumCodeChecks:
     if validate_stabilizer_code is None:
@@ -66,23 +65,3 @@ def write_check_generators(stream : IOBase, checks : QuantumCodeChecks):
         for row_index in range(num_rows(check_matrix)):
             col_list = " ".join(str(col) for col in sparse.find(check_matrix[row_index, :])[1])
             stream.write(f'{col_list} {check_type}\n')
-
-def test_check_io():
-    from .code_examples import d3_rotated_surface_code, random_test_hgp
-    from io import StringIO
-
-    for checks in [d3_rotated_surface_code(), random_test_hgp()[0]]:
-        # Write the code out
-        test_buffer = StringIO()
-        write_check_generators(test_buffer, checks)
-
-        # Read it back
-        test_buffer.seek(0)
-        new_checks = read_check_generators(test_buffer, validate_stabilizer_code=True)
-
-        # Should be identity
-        assert (new_checks.x != checks.x).nnz == 0
-        assert (new_checks.z != checks.z).nnz == 0
-        assert new_checks.num_qubits == checks.num_qubits
-
-
