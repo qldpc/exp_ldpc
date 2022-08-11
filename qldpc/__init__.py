@@ -1,4 +1,5 @@
 from .storage_sim import depolarizing_noise_model, build_storage_simulation
+from .edge_coloring import edge_color_bipartite
 from .hypergraph_product_code import biregular_hgp
 from .random_biregular_graph import random_biregular_graph, remove_short_cycles
 from .lifted_product_code import lifted_product_code_pgl2, lifted_product_code_cyclic
