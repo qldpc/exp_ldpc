@@ -10,7 +10,7 @@ from .qecc_util import GF2
 @dataclass
 class SpacetimeCodeSingleShot:
     check_matrix : sparse.spmatrix
-    final_correction : Callable[[np.array], np.array]
+    final_correction : None #Callable[[np.array], np.array]
 
 def single_shot(check_matrix : sparse.spmatrix) -> (sparse.spmatrix, Callable[[np.array], np.array]):
     '''Construct a check matrix that is extended for measurement errors.
@@ -28,8 +28,8 @@ def single_shot(check_matrix : sparse.spmatrix) -> (sparse.spmatrix, Callable[[n
 @dataclass
 class SpacetimeCode:
     check_matrix : sparse.spmatrix
-    syndrome_from_history : Callable[Callable[[int], [np.array]], np.array, np.array]
-    final_correction : Callable[Callable[[int], np.array], np.array]
+    syndrome_from_history : None #Callable[Callable[[int], [np.array]], np.array, np.array]
+    final_correction : None #Callable[Callable[[int], np.array], np.array]
 
 def spacetime_code(check_matrix : sparse.spmatrix, num_rounds : int) -> SpacetimeCode:
     '''Construct a check matrix that is the corresponding space-time code that localizes errors to single points in a syndrome history.
