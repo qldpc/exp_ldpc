@@ -10,5 +10,6 @@ in
       ps.galois
       ps.stim
       ps.qldpc
+      ps.ldpc
     ])) ];
   }
