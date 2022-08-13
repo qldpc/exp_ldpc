@@ -20,7 +20,7 @@ buildPythonPackage rec {
   cargoDeps = rustPlatform.fetchCargoTarball {
     inherit src;
     name = "${pname}-${version}";
-    hash = "sha256-iAHrHJte1UeCHYtYLCqXSPeVDjW9tWVMPM+JmeqDIqM=";
+    hash = "sha256-/TD7WlgIwWejNHHLgNeG7ui6J7se1SguhLPPC7dzKfU=";
   };
 
   buildInputs = lib.optionals stdenv.isDarwin [ libiconv ];
