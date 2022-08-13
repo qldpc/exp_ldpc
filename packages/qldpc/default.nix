@@ -12,7 +12,7 @@
 
 buildPythonPackage rec {
   pname = "qldpc";
-  version = "0.7.0";
+  version = "0.8.0";
   format = "pyproject";
   src = ../../.;
   nativeBuildInputs = with rustPlatform; [ cargoSetupHook maturinBuildHook ];
@@ -20,7 +20,7 @@ buildPythonPackage rec {
   cargoDeps = rustPlatform.fetchCargoTarball {
     inherit src;
     name = "${pname}-${version}";
-    hash = "sha256-/TD7WlgIwWejNHHLgNeG7ui6J7se1SguhLPPC7dzKfU=";
+    hash = "sha256-Mo4aOJt+q8C2H31/UzKTY6Rv6f0+0cGKqjMpqr1o38M=";
   };
 
   buildInputs = lib.optionals stdenv.isDarwin [ libiconv ];
