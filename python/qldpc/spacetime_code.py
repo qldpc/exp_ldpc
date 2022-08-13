@@ -1,16 +1,14 @@
 from typing import Callable, Iterable, Tuple, Dict, List, Deque
 from dataclasses import dataclass
-from collections import deque
 import scipy.sparse as sparse
 import numpy as np
 from itertools import repeat
 from functools import partial
-from .qecc_util import GF2
 
 @dataclass
 class SpacetimeCodeSingleShot:
     check_matrix : sparse.spmatrix
-    final_correction : None #Callable[[np.array], np.array]
+    final_correction : Callable[[np.array], np.array]
 
 def single_shot(check_matrix : sparse.spmatrix) -> (sparse.spmatrix, Callable[[np.array], np.array]):
     '''Construct a check matrix that is extended for measurement errors.
@@ -28,8 +26,8 @@ def single_shot(check_matrix : sparse.spmatrix) -> (sparse.spmatrix, Callable[[n
 @dataclass
 class SpacetimeCode:
     check_matrix : sparse.spmatrix
-    syndrome_from_history : None #Callable[Callable[[int], [np.array]], np.array, np.array]
-    final_correction : None #Callable[Callable[[int], np.array], np.array]
+    syndrome_from_history : Callable[[Callable[[int], np.array], np.array], np.array]
+    final_correction : Callable[[Callable[[int], np.array]], np.array]
 
 def spacetime_code(check_matrix : sparse.spmatrix, num_rounds : int) -> SpacetimeCode:
     '''Construct a check matrix that is the corresponding space-time code that localizes errors to single points in a syndrome history.
@@ -39,13 +37,24 @@ def spacetime_code(check_matrix : sparse.spmatrix, num_rounds : int) -> Spacetim
     check_matrix_coo = check_matrix.tocoo()
     spacetime_check_matrix = sparse.block_diag(repeat(check_matrix_coo, num_rounds+1))
 
-    # Add measurement failure bits
     data_block_size = spacetime_check_matrix.shape[1]
-    spacetime_check_matrix = sparse.hstack([spacetime_check_matrix, sparse.zeros((num_rounds+1, num_rounds))])
-    for i, pair in enumerate([(i*r + j, (i+1)*r + j) for i in num_rounds for j in r]):
+    r = check_matrix.shape[0]
+
+    # Add measurement failure bits    
+    measurement_block_i = np.zeros(num_rounds*r*2)
+    measurement_block_j = np.zeros(num_rounds*r*2)
+
+    for i, pair in enumerate((i*r + j, (i+1)*r + j) for i in range(num_rounds) for j in range(r)):
         x1, x2 = pair
-        spacetime_check_matrix[x1, data_block_size + i] = 1
-        spacetime_check_matrix[x2, data_block_size + i] = 1
+        measurement_block_i[i*2  ] = x1
+        measurement_block_j[i*2  ] = i
+        
+        measurement_block_i[i*2+1] = x2
+        measurement_block_j[i*2+1] = i
+
+    measurement_block = sparse.coo_matrix((np.ones_like(measurement_block_i), (measurement_block_i, measurement_block_j)),
+        shape=((num_rounds+1)*r, num_rounds*r), dtype=np.uint32)
+    spacetime_check_matrix = sparse.hstack([spacetime_check_matrix, measurement_block])
 
     syndrome_from_history = partial(spacetime_syndrome, rounds=num_rounds, check_matrix=check_matrix)
     return SpacetimeCode(spacetime_check_matrix, syndrome_from_history, partial(correction_from_spacetime_correction, rounds=num_rounds))

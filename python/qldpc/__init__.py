@@ -6,6 +6,8 @@ from .lifted_product_code import lifted_product_code_pgl2, lifted_product_code_c
 from .quantum_code_io import read_check_generators, write_check_generators
 from .swap_route import grid_permutation_route, product_permutation_route
 from .qecc_util import GF2, QuantumCode, QuantumCodeChecks, QuantumCodeLogicals
+from . import spacetime_code
+from . import code_examples
 
 # Import decoders but don't blow up if we want to use some of the other routines without compiling the decoder library
 import warnings
