@@ -46,7 +46,7 @@ def read_check_generators(stream : IOBase, validate_stabilizer_code = None) -> Q
     
     x_checks = make_check_matrix(x_checks, qubit_count)
     z_checks = make_check_matrix(z_checks, qubit_count)
-    checks = QuantumCodeChecks(x_checks, z_checks, qubit_count)
+    checks = QuantumCodeChecks(x_checks, z_checks)
 
     if validate_stabilizer_code is True:
         if not np.all((checks.x @ checks.z.transpose()).data%2 == 0):

@@ -338,7 +338,7 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
     if check_complex:
         assert np.all((partial_1 @ partial_2).data % 2 == 0)
 
-    checks = QuantumCodeChecks(partial_2.T.astype(np.int32), partial_1.astype(np.int32), partial_1.shape[1])
+    checks = QuantumCodeChecks(partial_2.T.astype(np.uint32), partial_1.astype(np.uint32))
     logicals = get_logicals(checks, compute_logicals=compute_logicals, check_complex=check_complex)
 
     # dimensions match

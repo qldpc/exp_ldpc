@@ -58,7 +58,7 @@ def get_logicals(checks : QuantumCodeChecks , compute_logicals, check_complex) -
 
             assert len(x_logicals) + np.linalg.matrix_rank(partial_1_dense) + np.linalg.matrix_rank(partial_2_dense) == partial_1.shape[1]
             
-    return QuantumCodeLogicals(x_logicals.astype(np.int32), z_logicals.astype(np.int32), len(x_logicals))
+    return QuantumCodeLogicals(x_logicals.astype(np.uint32), z_logicals.astype(np.uint32))
 
     
 
@@ -88,7 +88,7 @@ def homological_product(partial_A : sparse.spmatrix, partial_B : sparse.spmatrix
     if check_complex:
         assert np.all((partial_1 @ partial_2).data % 2 == 0)
 
-    checks = QuantumCodeChecks(partial_2.tocsc().transpose().astype(np.int32), partial_1.tocsr().astype(np.int32), num_cols(partial_1))
+    checks = QuantumCodeChecks(partial_2.tocsc().transpose().astype(np.uint32), partial_1.tocsr().astype(np.uint32))
     logicals = get_logicals(checks, compute_logicals, check_complex)
 
     # C2 dimension
