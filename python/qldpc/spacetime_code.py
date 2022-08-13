@@ -37,7 +37,6 @@ def spacetime_code(check_matrix : sparse.spmatrix, num_rounds : int) -> Spacetim
     check_matrix_coo = check_matrix.tocoo()
     spacetime_check_matrix = sparse.block_diag(repeat(check_matrix_coo, num_rounds+1))
 
-    data_block_size = spacetime_check_matrix.shape[1]
     r = check_matrix.shape[0]
 
     # Add measurement failure bits    
@@ -56,8 +55,8 @@ def spacetime_code(check_matrix : sparse.spmatrix, num_rounds : int) -> Spacetim
         shape=((num_rounds+1)*r, num_rounds*r), dtype=np.uint32)
     spacetime_check_matrix = sparse.hstack([spacetime_check_matrix, measurement_block])
 
-    syndrome_from_history = partial(spacetime_syndrome, rounds=num_rounds, check_matrix=check_matrix)
-    return SpacetimeCode(spacetime_check_matrix, syndrome_from_history, partial(correction_from_spacetime_correction, rounds=num_rounds))
+    syndrome_from_history = partial(spacetime_syndrome, num_rounds, check_matrix)
+    return SpacetimeCode(spacetime_check_matrix, syndrome_from_history, partial(correction_from_spacetime_correction, check_matrix.shape[1], num_rounds))
 
 def spacetime_code_sliding_window(check_matrix : sparse.spmatrix, num_window_size : int) -> sparse.spmatrix:
     pass
@@ -78,14 +77,14 @@ def spacetime_syndrome(rounds : int, check_matrix : sparse.spmatrix, syndrome_hi
     # Take differences
     # Each row is a timestep
     syndrome_matrix = syndrome.reshape((rounds+1, r), order='C')
-    # Do this in two steps to avoid mutation problems wit
+    # Do this in two steps to avoid mutation problems
     diff = (syndrome_matrix[1:rounds+1, :] + syndrome_matrix[0:rounds, :])%2
     syndrome_matrix[1:rounds+1, :] = diff
     syndrome = syndrome_matrix.reshape((rounds+1)*r, order='C')
     
     return syndrome
     
-def correction_from_spacetime_correction(rounds : int, spacetime_correction : Callable[[int], np.array]) -> np.array:
+def correction_from_spacetime_correction(num_qubits : int, rounds : int, spacetime_correction : np.array) -> np.array:
     '''Convert a correction of the spacetime code to a correction to the final round'''
-    return sum(map(spacetime_correction, range(rounds+1)))%2
+    return sum(spacetime_correction[i*num_qubits : (i+1)*num_qubits] for i in range(rounds+1))%2
     
