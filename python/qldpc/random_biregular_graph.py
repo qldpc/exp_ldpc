@@ -93,7 +93,7 @@ def _bfs_girth(graph, node, max_depth : int):
     except StopIteration:
         return None
 
-def remove_short_cycles(graph : nx.Graph, girth_bound : int, seed=None, patience=10000):
+def remove_short_cycles(graph : nx.Graph, girth_bound : int, seed=None, patience=1000000):
     '''Remove short cycles in a bipartite graph (inplace) by swapping edges at random so that the girth is strictly greater than girth_bound'''
     left_vertex_set = list(nx.subgraph_view(graph, filter_node=lambda node: graph.nodes[node]['bipartite'] == 0).nodes())
     rng = np.random.default_rng(seed=seed)
@@ -119,3 +119,5 @@ def remove_short_cycles(graph : nx.Graph, girth_bound : int, seed=None, patience
                     graph.remove_edge(u2, v2)
                     graph.add_edge(u1, v2)
                     graph.add_edge(u2, v1)
+            else:
+                raise RuntimeError("Patience exceeded while removing short cycles.")
