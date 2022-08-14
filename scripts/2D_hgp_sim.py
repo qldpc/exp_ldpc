@@ -1,5 +1,6 @@
 from cmath import log
 from qldpc import *
+from qldpc.noise_model import depolarizing_noise
 import stim
 
 if __name__ == '__main__':
@@ -8,7 +9,7 @@ if __name__ == '__main__':
     rounds = 1
     samples = 1024
 
-    noise_model = lambda *x: depolarizing_noise_model(p, p, *x)
+    noise_model = lambda *x: depolarizing_noise(p, p, *x)
     circuit, meas_result, data_result = build_storage_simulation(rounds, noise_model, checks, use_x_logicals = False)
     
     print(checks, logicals)

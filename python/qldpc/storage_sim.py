@@ -3,7 +3,6 @@ from typing import Callable, Iterable, Tuple, Dict, List, Deque
 from .edge_coloring import edge_color_bipartite
 from .qecc_util import num_rows, QuantumCodeChecks
 from collections import deque
-import re
 import numpy as np
 
 MeasurementOrder = Tuple[int, Dict[int, int]]
@@ -69,18 +68,6 @@ def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[List[int], List[i
     # circuit.append('TICK')  # --------
     return (list(range(num_data_qubits)), x_check_ancillas, z_check_ancillas, circuit)
 
-measurement_gates = ['M', 'MZ', 'MX', 'MY', 'MPP', 'MR', 'MRZ', 'MRX', 'MRY']
-measurement_line_pattern = re.compile(f'^(?:\\s*)({"|".join(measurement_gates)})((?:\\s*\\d+\\s*)+)$')
-
-def rewrite_measurement_noise(p : float, circuit_line : str) -> str:
-    '''Rewrite all measurements to contain noise with parameter p'''
-    search_result = measurement_line_pattern.search(circuit_line)
-    if search_result is None:
-        return circuit_line
-    else:
-        (meas_type, targets) = search_result.group(1,2)
-        return f'{meas_type}({p}){targets}'
-
 def circuit_ticks(circuit : Iterable[str]) -> Deque[Deque[str]]:
     '''Returns a list of subcircuits separated by a TICK'''
     subcircuits = deque()
@@ -95,22 +82,6 @@ def circuit_ticks(circuit : Iterable[str]) -> Deque[Deque[str]]:
         except StopIteration:
             break
     return subcircuits
-
-def depolarizing_noise_model(p : float, pm : float, data_qubit_indices : Iterable[int], _ancilla_qubit_indices : Iterable[int], circuit : Iterable[str]) -> Deque[str]:
-    '''Apply depolarizing noise to data qubits with rate p in any timestep where measurements take place. Also flip measurements with probability pm'''
-    noisy_circuit = deque()
-    for timestep in circuit_ticks(circuit):
-        try:
-            # Look for a measurement in this timestep
-            next(filter(lambda line: measurement_line_pattern.search(line) is not None, timestep))
-            # Add depolarizing noise
-            noisy_circuit.append(f'DEPOLARIZE1({p}) {" ".join(str(i) for i in data_qubit_indices)}')
-            noisy_circuit.extend(rewrite_measurement_noise(pm, line) for line in timestep)
-        except StopIteration:
-            # Identity if no measurement
-            noisy_circuit.extend(timestep)
-      
-    return noisy_circuit
 
 noise_channels = (
     'CORRELATED_ERROR',

@@ -1,7 +1,8 @@
 from itertools import chain
 from collections import deque
 
-from qldpc import depolarizing_noise_model, build_storage_simulation
+from qldpc import build_storage_simulation
+from qldc.noise_model import depolarizing_noise
 from qldpc.storage_sim import build_perfect_circuit
 from qldpc.code_examples import random_test_hgp
 
@@ -17,7 +18,7 @@ def test_noise_rewrite():
         'MX 0',
     ]
 
-    rewritten_circuit = depolarizing_noise_model(0.1, 0.2, [1], [0,2], circuit)
+    rewritten_circuit = depolarizing_noise(0.1, 0.2, [1], [0,2], circuit)
 
     # Golden test for now
     assert rewritten_circuit[4] == 'DEPOLARIZE1(0.1) 1'
@@ -54,7 +55,7 @@ def test_ancilla_targets():
             assert CZ_targets[m] == set(checks.z[i-checks.x.shape[0],:].nonzero()[1])
 
 
-def smoketest_storage_sim():
-    noise_model = lambda *x: depolarizing_noise_model(p_ph, 0, *x)
+def test_smoketest_storage_sim():
+    noise_model = lambda *x: depolarizing_noise(0.1, 0, *x)
     checks, _ = random_test_hgp(compute_logicals=False)
     build_storage_simulation(3, noise_model, checks.x, use_x_logicals = False)
