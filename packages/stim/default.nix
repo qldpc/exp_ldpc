@@ -7,7 +7,12 @@
 , fetchFromGitHub
 , numpy
 , pybind11
+# Check dependencies
 , cirq
+, matplotlib
+, networkx
+, scipy
+, pandas
 }:
 
 buildPythonPackage rec {
@@ -32,6 +37,11 @@ buildPythonPackage rec {
   checkInputs = [
     pytestCheckHook
     pytest-xdist
+
+    matplotlib
+    networkx
+    scipy
+    pandas
   ];
 
   meta = {
@@ -48,24 +58,15 @@ buildPythonPackage rec {
 
   # Requires various extra deps
   disabledTestPaths = [
-    # Cirq
+    # No cirq
     "glue/cirq/stimcirq"
-    # Matplotlib
-    "glue/sample/src/sinter/plotting_test.py"
+    # No pymatching
     "glue/sample/src/sinter/main_test.py"
-    # Networkx
-    "glue/zx/stimzx/_external_stabilizer_test.py"
-    "glue/zx/stimzx/_text_diagram_parsing_test.py"
-    "glue/zx/stimzx/_zx_graph_solver_test.py"
-    # Pymatching
     "glue/sample/src/sinter/decoding_test.py"
     "glue/sample/src/sinter/predict_test.py"
     "glue/sample/src/sinter/collection_test.py"
     "glue/sample/src/sinter/collection_work_manager.py"
-    # Scipy
-    "glue/sample/src/sinter/probability_util_test.py"
+    # Actually just fails
     "glue/sample/src/sinter/worker_test.py"
-    # Pandas
-    "glue/sample/src/sinter/main_combine.py"
   ];
 }
