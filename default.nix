@@ -5,12 +5,10 @@ let
     packageOverrides = pythonPackageOverlay;
   };
 in 
-  pkgs.mkShell {
-    buildInputs = [ (python.withPackages (ps: [
+  python.withPackages (ps: [
       ps.galois
       ps.stim
       ps.qldpc
       ps.ldpc
       ps.pytest
-    ])) ];
-  }
+    ])
