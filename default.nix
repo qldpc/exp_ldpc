@@ -11,5 +11,6 @@ in
       ps.stim
       ps.qldpc
       ps.ldpc
+      ps.pytest
     ])) ];
   }

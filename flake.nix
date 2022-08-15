@@ -12,8 +12,7 @@
           pythonPackageOverlay = import ./packages; 
         in
         {
-          # devShell for nix develop
-          devShells.default = (pkgs.callPackage ./default.nix { });
+          packages.default = (pkgs.callPackage ./default.nix { });
           # Overlay for building your own python environment 
           # Note this is an overlay of _python packages_
           # See how it is used/added to in default.nix
