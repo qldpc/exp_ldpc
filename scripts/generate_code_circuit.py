@@ -11,6 +11,7 @@ if __name__ == '__main__':
         Classical code data vertex count in input to hypergraph product code. 
         (n dv)/dc must be integer. The total number of qubits in the quantum code is (1+(dv/dc)^2) n^2, and the total number of checks is (2dv/dc) n^2.''')
     parser.add_argument('--girth_bound', type=int, help='Remove all cycles of length <= girth_bound in the classical tanner graph', default=None)
+    parser.add_argument('--girth_bound_patience', type=int, help='Timeout for random swaps to achieve girth bound', default=100000)
     parser.add_argument('--rounds', type=int, help='Number of rounds of syndrome extraction', default=1)
     parser.add_argument('--seed', type=lambda x: int(x) if x is not None else None, help='PRNG seed', default=None)
     parser.add_argument('--save_code', type=Path, help='File path to save the code to')
@@ -31,7 +32,8 @@ if __name__ == '__main__':
         print('Logicals save destination already exists')
         exit(-1)
 
-    code = biregular_hgp(args.nv, args.dv, args.dc, seed=args.seed, compute_logicals=(args.save_logicals is not None), girth_bound=args.girth_bound)
+    code = biregular_hgp(args.nv, args.dv, args.dc, seed=args.seed, compute_logicals=(args.save_logicals is not None),
+        girth_bound=args.girth_bound, girth_bound_patience=args.girth_bound_patience)
 
     id_noise_model = lambda a, b, x: x
     circuit, _, _ = build_storage_simulation(args.rounds, id_noise_model, code.checks, use_x_logicals = False)
