@@ -1,7 +1,9 @@
 import networkx as nx
 import numpy as np
 import itertools
-from typing import Tuple
+from collections import deque
+from typing import Tuple, Optional
+from scipy.stats import rv_discrete
 
 def _canonicalize_edge(x : Tuple[int, int]) -> Tuple[int, int]:
     return (x[0], x[1]) if x[0] < x[1] else (x[1], x[0])
@@ -86,38 +88,91 @@ def random_biregular_graph(num_checks : int, num_data : int, data_degree : int, 
 
     return tanner_graph
 
-def _bfs_girth(graph, node, max_depth : int):
-    '''Find a cycle of length up to max depth going through node via BFS'''
-    try:
-        return next(nx.all_simple_paths(graph, node, node, cutoff=max_depth))
-    except StopIteration:
-        return None
+def _search_cycle(graph, source, depth_limit : int) -> Optional[Tuple[int, Tuple[int, int]]]:
+    '''Returns (l, edge) where edge is contained in a length l cycle through source.
+    When the graph is bipartite, this edge is contained in a shortest cycle.
+    Otherwise, the edge is contained in a cycle of length at most 1 greater than the shortest cycle.
+    Searches only up to depth_limit. For bipartite graphs a cycle will only be found if its length is <= 2*search_depth
+    I. Alon and M. Rodeh, SIAM J. Comput. 7(4), 413-423 (1978).
+    '''
+
+    level = dict()
+    traverse = deque()
+    traverse.append(source)
+    level[source] = 0
+
+    while len(traverse) > 0:
+        u = traverse.popleft()
+        u_level = level[u]
+
+        for neighbor in graph.neighbors(u):
+            n_level = level.get(neighbor, None)
+            if n_level is None:
+                n_level = u_level+1
+                level[neighbor] = n_level
+                if n_level < depth_limit:
+                    traverse.append(neighbor)
+            else:
+                if u_level <= n_level:
+                    return (2*(u_level+1), (u, neighbor))
+    return None
+
 
 def remove_short_cycles(graph : nx.Graph, girth_bound : int, seed=None, patience=1000000):
     '''Remove short cycles in a bipartite graph (inplace) by swapping edges at random so that the girth is strictly greater than girth_bound'''
-    left_vertex_set = list(nx.subgraph_view(graph, filter_node=lambda node: graph.nodes[node]['bipartite'] == 0).nodes())
+
+    depth_limit = girth_bound//2
+    left_vertex_set = np.array(nx.subgraph_view(graph, filter_node=lambda node: graph.nodes[node]['bipartite'] == 0).nodes())
     rng = np.random.default_rng(seed=seed)
-    num_edges = len(graph.edges)
+    # Amortize the exit check between this many random vertex selections
+    exit_check_interval = left_vertex_set.shape[0]*10
 
-    for _ in range(patience):
-        for node in left_vertex_set:
-            path = _bfs_girth(graph, node, max_depth=girth_bound)
-            if path is None:
-                continue
+    # Networkx does not expose a method to sample edges in O(1) without ammortizing an O(n) operation that is invalidated after mutating the graph
+    # So we need to do this manually
+    # Sample a vertex weighted by its degree and then sample a random edge
+    # Equivalent to sampling edges at random
+    vertices = np.fromiter(graph.nodes(), dtype=np.int32)
+    degrees = np.fromiter(map(lambda n: graph.degree(n), vertices), dtype=np.int32)
+    vertex_distr = rv_discrete(values=(vertices, degrees/np.sum(degrees)))
 
-            (u1, v1) = _canonicalize_edge_bipartite(graph, path[2:])
-            # Select new edge
+    # Check if all short cycles have been removed
+    def full_clear():
+        return all(map(lambda v: _search_cycle(graph, v, depth_limit=depth_limit) is None, left_vertex_set))
+
+    for t in range(patience):
+        # Exit condition
+        if t%exit_check_interval == 0 and full_clear():
+            break
+
+        # Select a node at random to check the girth condition
+        node = rng.choice(left_vertex_set)
+        cycle = _search_cycle(graph, node, depth_limit=depth_limit)
+        if cycle is not None:
+            # Short cycle was found
+            _, edge = cycle
+            (u1, v1) = _canonicalize_edge_bipartite(graph, edge)
+
+            # Attempt to swap it with another edge
             for _ in range(patience):
-                candidate_edge = graph.edges[rng.integers(num_edges)]
-                # Ensure we can swap while maintaining a graph
-                (u2, v2) = _canonicalize_edge_bipartite(candidate_edge[:2])
+                # Select new edge
+                rand_vertex = vertex_distr.rvs(random_state = rng)
+                candidate_edge = rng.choice(list(graph.edges(rand_vertex)))
+                # Ensure we can swap it without making a multi-edge
+                (u2, v2) = _canonicalize_edge_bipartite(graph, candidate_edge[:2])
                 # Check u2 not neighbor of v1
                 # Check u1 not neighbor of v2
-                if u2 not in graph.neighbors(v1) and u1 not in graph.neighbors(v2):
+                neighborhood_good = u2 not in graph.neighbors(v1) and u1 not in graph.neighbors(v2)
+                # Check that we do not have something like \/ formed from 3 vertices
+                unique_endpoints = u1 != u2 and v1 != v2
+                if unique_endpoints and neighborhood_good:
                     # Swap edges
                     graph.remove_edge(u1, v1)
                     graph.remove_edge(u2, v2)
                     graph.add_edge(u1, v2)
                     graph.add_edge(u2, v1)
+                    break
             else:
-                raise RuntimeError("Patience exceeded while removing short cycles.")
+                raise RuntimeError("Patience exceeded while selecting an edge to swap in short cycle removal.")
+    else:
+        if not full_clear():
+            raise RuntimeError("Patience exceeded while removing short cycles.")

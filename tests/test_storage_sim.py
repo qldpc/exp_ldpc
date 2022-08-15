@@ -2,7 +2,7 @@ from itertools import chain
 from collections import deque
 
 from qldpc import build_storage_simulation
-from qldc.noise_model import depolarizing_noise
+from qldpc.noise_model import depolarizing_noise
 from qldpc.storage_sim import build_perfect_circuit
 from qldpc.code_examples import random_test_hgp
 
@@ -57,5 +57,5 @@ def test_ancilla_targets():
 
 def test_smoketest_storage_sim():
     noise_model = lambda *x: depolarizing_noise(0.1, 0, *x)
-    checks, _ = random_test_hgp(compute_logicals=False)
-    build_storage_simulation(3, noise_model, checks.x, use_x_logicals = False)
+    code = random_test_hgp(compute_logicals=False)
+    build_storage_simulation(3, noise_model, code.checks, use_x_logicals = False)

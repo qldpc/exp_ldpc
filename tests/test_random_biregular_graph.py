@@ -1,5 +1,5 @@
 from qldpc import random_biregular_graph, remove_short_cycles
-from qldpc.random_biregular_graph import _bfs_girth
+from qldpc.random_biregular_graph import _search_cycle
 import networkx as nx
 import pytest
 
@@ -16,7 +16,7 @@ def check_biregular(G, data_degree, check_degree, check_type=True):
 def check_girth(G, girth_bound):
     '''Check that the girth is strictly greater than girth_bound'''
     for node in G.nodes:
-        assert _bfs_girth(G, node, girth_bound) is None
+        assert _search_cycle(G, node, (girth_bound+1)//2) is None
 
 seeds = [
     0x59824c5a, 0x9dca707a, 0xe0218aa8, 0x81da8035, 
@@ -42,11 +42,20 @@ def test_smoketest_random_biregular_graph(left_vertices, right_deg, left_deg, se
 def test_remove_short_cycles(seed):
     left_deg = 4
     right_deg = 3
-    left_vertices = 51
+    left_vertices = 102
     right_vertices = left_vertices*left_deg//right_deg
     graph = random_biregular_graph(left_vertices, right_vertices, right_deg, left_deg, seed=seed)
 
-    remove_short_cycles(graph, 4)
-    check_girth(graph, 4)
+    girth_bound = 4
+    remove_short_cycles(graph, girth_bound, seed=seed-42, patience=10000)
+    check_girth(graph, girth_bound)
 
     check_biregular(graph, right_deg, left_deg)
+
+def test_check_girth():
+    graph = nx.cycle_graph(6)
+    assert _search_cycle(graph, 0, 2) is None
+    cycle_len, edge = _search_cycle(graph, 0, 3)
+    assert cycle_len == 6
+    assert edge is not None
+    
