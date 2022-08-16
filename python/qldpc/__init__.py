@@ -5,7 +5,7 @@ from .random_biregular_graph import random_biregular_graph, remove_short_cycles
 from .lifted_product_code import lifted_product_code_pgl2, lifted_product_code_cyclic
 from .quantum_code_io import read_check_generators, write_check_generators
 from .swap_route import grid_permutation_route, product_permutation_route
-from .qecc_util import GF2, QuantumCode, QuantumCodeChecks, QuantumCodeLogicals
+from .qecc_util import GF2, QuantumCode, QuantumCodeChecks, QuantumCodeLogicals, CircuitTargets
 from . import noise_model
 from . import spacetime_code
 from . import code_examples

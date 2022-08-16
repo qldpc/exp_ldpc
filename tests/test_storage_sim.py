@@ -1,7 +1,7 @@
 from itertools import chain
 from collections import deque
 
-from qldpc import build_storage_simulation
+from qldpc import build_storage_simulation, CircuitTargets
 from qldpc.noise_model import depolarizing_noise
 from qldpc.storage_sim import build_perfect_circuit
 from qldpc.code_examples import random_test_hgp
@@ -18,7 +18,8 @@ def test_noise_rewrite():
         'MX 0',
     ]
 
-    rewritten_circuit = depolarizing_noise(0.1, 0.2, [1], [0,2], circuit)
+    targets = CircuitTargets([1], [0,2], [])
+    rewritten_circuit = depolarizing_noise(0.1, 0.2).rewrite(targets, circuit)
 
     # Golden test for now
     assert rewritten_circuit[4] == 'DEPOLARIZE1(0.1) 1'
@@ -30,14 +31,14 @@ def test_ancilla_targets():
     # Reconstruct the checks from the syndrome extraction circuit and verify they match the code
     checks = random_test_hgp(compute_logicals=False).checks
     
-    data_qubit_idx, x_ancilla_idx, z_ancilla_idx, circuit = build_perfect_circuit(checks)
+    targets, circuit = build_perfect_circuit(checks)
 
-    x_ancilla_idx = frozenset(x_ancilla_idx)
+    x_ancilla_idx = frozenset(targets.x_checks)
     measurement_order = deque(map(lambda x: int(x), chain(*[s.split()[1:] for s in circuit if s.startswith(('MX', 'MRX'))])))
 
     # Find all the targets of CZ/CX
-    CX_targets = {i:set() for i in x_ancilla_idx}
-    CZ_targets = {i:set() for i in z_ancilla_idx}
+    CX_targets = {i:set() for i in targets.x_checks}
+    CZ_targets = {i:set() for i in targets.z_checks}
     for s in circuit:
         if s.startswith('CX'):
             _, control, target = s.split()
@@ -56,6 +57,6 @@ def test_ancilla_targets():
 
 
 def test_smoketest_storage_sim():
-    noise_model = lambda *x: depolarizing_noise(0.1, 0, *x)
+    noise_model = depolarizing_noise(0.1, 0)
     code = random_test_hgp(compute_logicals=False)
     build_storage_simulation(3, noise_model, code.checks, use_x_logicals = False)

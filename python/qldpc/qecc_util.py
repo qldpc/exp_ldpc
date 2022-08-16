@@ -1,4 +1,4 @@
-from typing import Iterable, Tuple
+from typing import Iterable, Tuple, List, Callable
 from scipy import sparse
 import numpy as np
 from galois import GF
@@ -111,6 +111,24 @@ class QuantumCode:
 
         object.__setattr__(self, 'checks', checks)
         object.__setattr__(self, 'logicals', logicals)
+
+@dataclass(frozen=True)
+class CircuitTargets:
+    data : List[int]
+    x_checks : List[int]
+    z_checks : List[int]
+    ancillas : List[int]
+
+    def __init__(self, data : List[int], x_checks : List[int], z_checks : List[int]):
+        object.__setattr__(self, 'data', data)
+        object.__setattr__(self, 'x_checks', x_checks)
+        object.__setattr__(self, 'z_checks', z_checks)
+        object.__setattr__(self, 'ancillas', x_checks+z_checks)
+
+
+@dataclass(frozen=True)
+class NoiseRewriter:
+    rewrite : Callable[[Iterable[str]], Iterable[str]]
 
 def num_rows(a : np.array) -> int:
     assert(len(a.shape) == 2)
