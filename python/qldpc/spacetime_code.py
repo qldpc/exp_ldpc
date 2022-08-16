@@ -4,64 +4,95 @@ import scipy.sparse as sparse
 import numpy as np
 from itertools import repeat
 from functools import partial
+from numpy.typing import ArrayLike
 
-@dataclass
+@dataclass(frozen=True)
 class SpacetimeCodeSingleShot:
     check_matrix : sparse.spmatrix
-    final_correction : Callable[[np.array], np.array]
+    _datablock_size : int
 
-def single_shot(check_matrix : sparse.spmatrix) -> (sparse.spmatrix, Callable[[np.array], np.array]):
-    '''Construct a check matrix that is extended for measurement errors.
-    We append columns to check matrix to extend the support of each check to a new bit.
-    Returns projection of correction to data bits
-    '''
+    def __init__(self, check_matrix : sparse.spmatrix):
+        '''Construct a check matrix that is extended for measurement errors.
+        We append columns to check matrix to extend the support of each check to a new bit.
+        '''
 
-    # Extend check matrix H to (H|I)
-    # The extra bits hanging off the end correspond to measurement failures
-    extended_check_matrix = sparse.hstack([check_matrix, sparse.identity(check_matrix.shape[0], dtype=check_matrix.dtype)])
-    # Project to the original data bits
-    projection = lambda x, n=check_matrix.shape[1]: x[:n]
-    return SpacetimeCodeSingleShot(extended_check_matrix, projection)
+        # Extend check matrix H to (H|I)
+        # The extra bits hanging off the end correspond to measurement failures
+        extended_check_matrix = sparse.hstack([check_matrix, sparse.identity(check_matrix.shape[0], dtype=check_matrix.dtype)])
+        # Project to the original data bits
+        object.__setattr__(self, '_datablock_size', check_matrix.shape[1])
+        object.__setattr__(self, 'check_matrix', extended_check_matrix)
+    
+    def final_correction(self, x : ArrayLike) -> ArrayLike:
+        '''Get the final round correction'''
+        return self.data_bits(x)
+    
+    def data_bits(self, x : ArrayLike) -> ArrayLike:
+        '''View to the data bits of the spacetime vector'''
+        return x[:self._datablock_size]
+    
+    def measurement_bits(self, x : ArrayLike) -> ArrayLike:
+        '''View to the measurement bits of the spacetime vector'''
+        return x[self._datablock_size:]
 
-@dataclass
+@dataclass(frozen=True)
 class SpacetimeCode:
     check_matrix : sparse.spmatrix
-    syndrome_from_history : Callable[[Callable[[int], np.array], np.array], np.array]
-    final_correction : Callable[[Callable[[int], np.array]], np.array]
+    _num_rounds : int
+    _datablock_size : int
 
-def spacetime_code(check_matrix : sparse.spmatrix, num_rounds : int) -> SpacetimeCode:
-    '''Construct a check matrix that is the corresponding space-time code that localizes errors to single points in a syndrome history.
-    (tracking syndrome differences)'''
+    def __init__(self, check_matrix : sparse.spmatrix, num_rounds : int):
+        '''Construct a check matrix that is the corresponding space-time code that localizes errors to single points in a syndrome history.
+        (tracking syndrome differences)'''
 
-    # Stack copies of the checks
-    check_matrix_coo = check_matrix.tocoo()
-    spacetime_check_matrix = sparse.block_diag(repeat(check_matrix_coo, num_rounds+1))
+        # Stack copies of the checks
+        check_matrix_coo = check_matrix.tocoo()
+        spacetime_check_matrix = sparse.block_diag(repeat(check_matrix_coo, num_rounds+1))
 
-    r = check_matrix.shape[0]
+        r = check_matrix.shape[0]
 
-    # Add measurement failure bits    
-    measurement_block_i = np.zeros(num_rounds*r*2)
-    measurement_block_j = np.zeros(num_rounds*r*2)
+        # Add measurement failure bits    
+        measurement_block_i = np.zeros(num_rounds*r*2)
+        measurement_block_j = np.zeros(num_rounds*r*2)
 
-    for i, pair in enumerate((i*r + j, (i+1)*r + j) for i in range(num_rounds) for j in range(r)):
-        x1, x2 = pair
-        measurement_block_i[i*2  ] = x1
-        measurement_block_j[i*2  ] = i
-        
-        measurement_block_i[i*2+1] = x2
-        measurement_block_j[i*2+1] = i
+        for i, pair in enumerate((i*r + j, (i+1)*r + j) for i in range(num_rounds) for j in range(r)):
+            x1, x2 = pair
+            measurement_block_i[i*2  ] = x1
+            measurement_block_j[i*2  ] = i
+            
+            measurement_block_i[i*2+1] = x2
+            measurement_block_j[i*2+1] = i
 
-    measurement_block = sparse.coo_matrix((np.ones_like(measurement_block_i), (measurement_block_i, measurement_block_j)),
-        shape=((num_rounds+1)*r, num_rounds*r), dtype=np.uint32)
-    spacetime_check_matrix = sparse.hstack([spacetime_check_matrix, measurement_block])
+        measurement_block = sparse.coo_matrix((np.ones_like(measurement_block_i), (measurement_block_i, measurement_block_j)),
+            shape=((num_rounds+1)*r, num_rounds*r), dtype=np.uint32)
+        spacetime_check_matrix = sparse.hstack([spacetime_check_matrix, measurement_block])
 
-    syndrome_from_history = partial(spacetime_syndrome, num_rounds, check_matrix)
-    return SpacetimeCode(spacetime_check_matrix, syndrome_from_history, partial(correction_from_spacetime_correction, check_matrix.shape[1], num_rounds))
+        object.__setattr__(self, 'check_matrix', spacetime_check_matrix)
+        object.__setattr__(self, '_num_rounds', num_rounds)
+        object.__setattr__(self, '_datablock_size', measurement_block.shape[1])
 
-def spacetime_code_sliding_window(check_matrix : sparse.spmatrix, num_window_size : int) -> sparse.spmatrix:
-    pass
+    def syndrome_from_history(self, history : Callable[[int], ArrayLike], readout : ArrayLike) -> ArrayLike:
+        '''Convert a history of measurements to a spacetime syndrome'''
+        return _spacetime_syndrome(self._num_rounds, self.check_matrix, history, readout)
 
-def spacetime_syndrome(rounds : int, check_matrix : sparse.spmatrix, syndrome_history : Callable[[int], np.array], readout : np.array) -> np.array:
+    def final_correction(self, spacetime_correction : ArrayLike) -> ArrayLike:
+        '''Convert a correction of the spacetime code to a correction to the final round'''
+        num_qubits = self.check_matrix.shape[1]
+        return sum(spacetime_correction[i*num_qubits : (i+1)*num_qubits] for i in range(self._num_rounds+1))%2
+
+    def data_bits(self, x : ArrayLike) -> ArrayLike:
+        '''View to the data bits of the spacetime vector'''
+        return x[:self._datablock_size]
+    
+    def measurement_bits(self, x : ArrayLike) -> ArrayLike:
+        '''View to the measurement bits of the spacetime vector'''
+        return x[self._datablock_size:]
+
+
+# def spacetime_code_sliding_window(check_matrix : sparse.spmatrix, num_window_size : int) -> sparse.spmatrix:
+#     pass
+
+def _spacetime_syndrome(rounds : int, check_matrix : sparse.spmatrix, syndrome_history : Callable[[int], np.array], readout : np.array) -> np.array:
     '''Convert a syndrome history + transverse readout into a syndrome for the spacetime code'''
     # number of checks
     r = check_matrix.shape[0]
@@ -83,8 +114,4 @@ def spacetime_syndrome(rounds : int, check_matrix : sparse.spmatrix, syndrome_hi
     syndrome = syndrome_matrix.reshape((rounds+1)*r, order='C')
     
     return syndrome
-    
-def correction_from_spacetime_correction(num_qubits : int, rounds : int, spacetime_correction : np.array) -> np.array:
-    '''Convert a correction of the spacetime code to a correction to the final round'''
-    return sum(spacetime_correction[i*num_qubits : (i+1)*num_qubits] for i in range(rounds+1))%2
     
