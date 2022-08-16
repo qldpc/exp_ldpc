@@ -3,7 +3,7 @@ from typing import Callable, Iterable, Tuple, Dict, List, Deque
 
 from .noise_model import NoiseRewriter
 from .edge_coloring import edge_color_bipartite
-from .qecc_util import num_rows, QuantumCodeChecks, NoiseRewriter, CircuitTargets
+from .qecc_util import num_rows, QuantumCodeChecks, NoiseRewriter, CircuitTargets, StorageSim
 from collections import deque
 import numpy as np
 
@@ -103,7 +103,7 @@ def _check_unique_targets(circuit : str):
     for timestep, timestep_circuit in enumerate(circuit.split('TICK')):
         unique_targets_timestep(discard_noise(timestep_circuit))
 
-def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, checks : QuantumCodeChecks, use_x_logicals = None) -> Tuple[str, Callable[[int, bool, list], list], Callable[[list], list]]:
+def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, checks : QuantumCodeChecks, use_x_logicals = None) -> StorageSim:
     '''Construct a simulation where a logical 0 is prepared stored for rounds number of QEC cycles then transversally read out
     use_x_logicals: prepare a |+> and read out in the X basis'''
     if use_x_logicals is None:
@@ -149,4 +149,4 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, checks :
         return measurement_vector[offset : offset+num_data_qubits]
 
     _check_unique_targets('\n'.join(circuit))
-    return (circuit, meas_result, data_result)
+    return StorageSim(circuit, meas_result, data_result)

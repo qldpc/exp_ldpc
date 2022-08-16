@@ -1,6 +1,7 @@
 from typing import Iterable, Tuple, List, Callable
 from scipy import sparse
 import numpy as np
+from numpy.typing import ArrayLike
 from galois import GF
 from dataclasses import dataclass, field
 from warnings import warn
@@ -142,3 +143,9 @@ def make_check_matrix(checks : Iterable[Iterable[int]], num_qubits) -> sparse.cs
     '''Given check matrix specified as non-zero entries, construct a scipy sparse matrix'''
     coo_entries = np.array([[row_index, v, 1] for (row_index, row) in enumerate(checks) for v in row])
     return sparse.csr_matrix((coo_entries[:,2], (coo_entries[:,0], coo_entries[:,1])), shape=(len(checks), num_qubits), dtype=np.int32)
+
+@dataclass(frozen=True)
+class StorageSim:
+    circuit : str
+    measurement_view : Callable[[int, bool, ArrayLike], ArrayLike]
+    data_view : Callable[[ArrayLike], ArrayLike]

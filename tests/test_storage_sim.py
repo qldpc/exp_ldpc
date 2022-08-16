@@ -6,6 +6,9 @@ from qldpc.noise_model import depolarizing_noise
 from qldpc.storage_sim import build_perfect_circuit
 from qldpc.code_examples import random_test_hgp
 
+import stim
+import numpy as np
+
 def test_noise_rewrite():
     circuit = [
         'RX 0 1 2',
@@ -58,5 +61,30 @@ def test_ancilla_targets():
 
 def test_smoketest_storage_sim():
     noise_model = depolarizing_noise(0.1, 0)
+    rounds = 3
+
     code = random_test_hgp(compute_logicals=False)
-    build_storage_simulation(3, noise_model, code.checks, use_x_logicals = False)
+    storage_sim = build_storage_simulation(rounds, noise_model, code.checks, use_x_logicals = False)
+    
+
+    sampler = stim.Circuit('\n'.join(storage_sim.circuit)).compile_sampler()
+    sample = np.where(sampler.sample(1)[0], 1, 0)
+
+    # Check that this is actually returning a view
+    for r in range(rounds):
+        for get_x_checks in [True, False]:
+            for pattern in [0,1]:
+                storage_sim.measurement_view(r, get_x_checks, sample)[:] = pattern
+                assert np.all(storage_sim.measurement_view(r, get_x_checks, sample) == pattern)
+
+        assert storage_sim.measurement_view(r, True, sample).shape[0] == code.checks.x.shape[0]
+        assert storage_sim.measurement_view(r, False, sample).shape[0] == code.checks.z.shape[0]
+
+    for pattern in [0,1]:
+        storage_sim.data_view(sample)[:] = pattern
+        assert np.all(storage_sim.data_view(sample) == pattern)
+
+    # Readout has the correct size
+    assert storage_sim.measurement_view(0, True, sample).shape[0] == code.checks.x.shape[0]
+    assert storage_sim.measurement_view(0, False, sample).shape[0] == code.checks.z.shape[0]
+    assert storage_sim.data_view(sample).shape[0] == code.num_qubits

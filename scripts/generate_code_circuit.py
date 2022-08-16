@@ -35,7 +35,7 @@ if __name__ == '__main__':
     code = biregular_hgp(args.nv, args.dv, args.dc, seed=args.seed, compute_logicals=(args.save_logicals is not None),
         girth_bound=args.girth_bound, girth_bound_patience=args.girth_bound_patience)
 
-    circuit, _, _ = build_storage_simulation(args.rounds, noise_model.trivial_noise(), code.checks, use_x_logicals = False)
+    storage_sim = build_storage_simulation(args.rounds, noise_model.trivial_noise(), code.checks, use_x_logicals = False)
 
     if args.save_code is not None:
         with args.save_code.open('w') as code_file:
@@ -49,4 +49,4 @@ if __name__ == '__main__':
 
     if args.save_circuit is not None:
         with args.save_circuit.open('w') as circuit_file:
-            circuit_file.write('\n'.join(circuit))
+            circuit_file.write('\n'.join(storage_sim.circuit))
