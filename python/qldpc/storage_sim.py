@@ -1,9 +1,7 @@
 from networkx.algorithms import bipartite
 from typing import Callable, Iterable, Tuple, Dict, List, Deque
-
-from .noise_model import NoiseRewriter
 from .edge_coloring import edge_color_bipartite
-from .qecc_util import num_rows, QuantumCodeChecks, NoiseRewriter, CircuitTargets
+from .qecc_util import num_rows, QuantumCodeChecks
 from collections import deque
 import numpy as np
 
@@ -35,7 +33,7 @@ def order_measurements(checks : QuantumCodeChecks) -> Tuple[int, MeasurementOrde
     assert x_data_nodes == z_data_nodes
     return (x_data_nodes, (x_check_nodes, xorder), (z_check_nodes, zorder) )
 
-def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[CircuitTargets, List[str]]:
+def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[List[int], List[int], List[int], List[str]]:
     '''Syndrome extraction circuit to measure X checks then Z checks'''
     (num_data_qubits, (x_check_count, x_check_schedule), (z_check_count, z_check_schedule)) = order_measurements(checks)
 
@@ -68,7 +66,22 @@ def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[CircuitTargets, L
 
     # Leave off the final tick so we can interleave this element
     # circuit.append('TICK')  # --------
-    return (CircuitTargets(list(range(num_data_qubits)), x_check_ancillas, z_check_ancillas), circuit)
+    return (list(range(num_data_qubits)), x_check_ancillas, z_check_ancillas, circuit)
+
+def circuit_ticks(circuit : Iterable[str]) -> Deque[Deque[str]]:
+    '''Returns a list of subcircuits separated by a TICK'''
+    subcircuits = deque()
+    subcircuits.append(deque())
+    circuit_iter = iter(circuit)
+    while True:
+        try:
+            line = next(circuit_iter)
+            subcircuits[-1].append(line)
+            if line.strip().upper() == 'TICK':
+                subcircuits.append(deque())
+        except StopIteration:
+            break
+    return subcircuits
 
 noise_channels = (
     'CORRELATED_ERROR',
@@ -103,7 +116,8 @@ def _check_unique_targets(circuit : str):
     for timestep, timestep_circuit in enumerate(circuit.split('TICK')):
         unique_targets_timestep(discard_noise(timestep_circuit))
 
-def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, checks : QuantumCodeChecks, use_x_logicals = None) -> Tuple[str, Callable[[int, bool, list], list], Callable[[list], list]]:
+# TODO: We will rewrite the perfect circuit to insert the appropriate fault locations noise model
+def build_storage_simulation(rounds : int, noise_model : Callable[[str], str], checks : QuantumCodeChecks, use_x_logicals = None) -> Tuple[str, Callable[[int, bool, list], list], Callable[[list], list]]:
     '''Construct a simulation where a logical 0 is prepared stored for rounds number of QEC cycles then transversally read out
     use_x_logicals: prepare a |+> and read out in the X basis'''
     if use_x_logicals is None:
@@ -111,31 +125,32 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, checks :
 
     reset_meas_basis = 'X' if use_x_logicals else 'Z'
 
-    targets, syndrome_extraction_circuit = build_perfect_circuit(checks)
+    (data_qubit_indices, x_check_indices, z_check_indices, syndrome_extraction_circuit) = build_perfect_circuit(checks)
 
     # Ensure the indices are contiguous since we will assume this later
-    assert all(targets.x_checks[i+1] == targets.x_checks[i] + 1 for i in range(len(targets.x_checks)-1))
-    assert all(targets.z_checks[i+1] == targets.z_checks[i] + 1 for i in range(len(targets.z_checks)-1))
-    assert targets.z_checks[0] == targets.x_checks[-1]+1
+    assert all(x_check_indices[i+1] == x_check_indices[i] + 1 for i in range(len(x_check_indices)-1))
+    assert all(z_check_indices[i+1] == z_check_indices[i] + 1 for i in range(len(z_check_indices)-1))
+    assert z_check_indices[0] == x_check_indices[-1]+1
     
-    x_check_count = len(targets.x_checks)
-    z_check_count = len(targets.z_checks)
+    x_check_count = len(x_check_indices)
+    z_check_count = len(z_check_indices)
 
     circuit = []
     # Prepare logical zero
     # We could optimize this by directly measuring the checks but it's a small cost
-    circuit.append(f'R{reset_meas_basis} {" ".join(str(i) for i in targets.data)}')
+    circuit.append(f'R{reset_meas_basis} {" ".join(str(i) for i in data_qubit_indices)}')
     circuit.append('TICK')
 
     # Do QEC
     for _ in range(rounds):
         circuit.extend(syndrome_extraction_circuit)
+
         
     # Read out data qubits
-    circuit.append(f'M{reset_meas_basis} {" ".join(str(i) for i in targets.data)}')
+    circuit.append(f'M{reset_meas_basis} {" ".join(str(i) for i in data_qubit_indices)}')
 
     # Rewrite circuit with noise model
-    circuit = noise_model.rewrite(targets, circuit)
+    circuit = noise_model(data_qubit_indices, x_check_indices+z_check_indices, circuit)
 
     def meas_result(round_index, get_x_checks, measurement_vector, *_, x_check_count=x_check_count, z_check_count=z_check_count):
         meas_round_offset = (x_check_count + z_check_count) * round_index
@@ -144,7 +159,7 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, checks :
 
         return measurement_vector[check_offset : check_offset + check_count]
 
-    def data_result(measurement_vector, *_, x_check_count=x_check_count, z_check_count=z_check_count, rounds=rounds, num_data_qubits = len(targets.data)):
+    def data_result(measurement_vector, *_, x_check_count=x_check_count, z_check_count=z_check_count, rounds=rounds, num_data_qubits = len(data_qubit_indices)):
         offset = (x_check_count + z_check_count)*rounds
         return measurement_vector[offset : offset+num_data_qubits]
 

@@ -1,4 +1,4 @@
-from qldpc import biregular_hgp, build_storage_simulation, noise_model, write_check_generators
+from qldpc import *
 from pathlib import Path
 import sys
 import argparse
@@ -35,7 +35,8 @@ if __name__ == '__main__':
     code = biregular_hgp(args.nv, args.dv, args.dc, seed=args.seed, compute_logicals=(args.save_logicals is not None),
         girth_bound=args.girth_bound, girth_bound_patience=args.girth_bound_patience)
 
-    circuit, _, _ = build_storage_simulation(args.rounds, noise_model.trivial_noise(), code.checks, use_x_logicals = False)
+    id_noise_model = lambda a, b, x: x
+    circuit, _, _ = build_storage_simulation(args.rounds, id_noise_model, code.checks, use_x_logicals = False)
 
     if args.save_code is not None:
         with args.save_code.open('w') as code_file:
