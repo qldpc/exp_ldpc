@@ -8,7 +8,7 @@ from numpy.typing import ArrayLike
 
 @dataclass(frozen=True)
 class SpacetimeCodeSingleShot:
-    check_matrix : sparse.spmatrix
+    spacetime_check_matrix : sparse.spmatrix
     _datablock_size : int
 
     def __init__(self, check_matrix : sparse.spmatrix):
@@ -21,7 +21,7 @@ class SpacetimeCodeSingleShot:
         extended_check_matrix = sparse.hstack([check_matrix, sparse.identity(check_matrix.shape[0], dtype=check_matrix.dtype)])
         # Project to the original data bits
         object.__setattr__(self, '_datablock_size', check_matrix.shape[1])
-        object.__setattr__(self, 'check_matrix', extended_check_matrix)
+        object.__setattr__(self, 'spacetime_check_matrix', extended_check_matrix)
     
     def final_correction(self, x : ArrayLike) -> ArrayLike:
         '''Get the final round correction'''
@@ -37,7 +37,8 @@ class SpacetimeCodeSingleShot:
 
 @dataclass(frozen=True)
 class SpacetimeCode:
-    check_matrix : sparse.spmatrix
+    spacetime_check_matrix : sparse.spmatrix
+    _check_matrix : sparse.spmatrix
     _num_rounds : int
     _datablock_size : int
 
@@ -67,17 +68,18 @@ class SpacetimeCode:
             shape=((num_rounds+1)*r, num_rounds*r), dtype=np.uint32)
         spacetime_check_matrix = sparse.hstack([spacetime_check_matrix, measurement_block])
 
-        object.__setattr__(self, 'check_matrix', spacetime_check_matrix)
+        object.__setattr__(self, '_check_matrix', check_matrix)
+        object.__setattr__(self, 'spacetime_check_matrix', spacetime_check_matrix)
         object.__setattr__(self, '_num_rounds', num_rounds)
         object.__setattr__(self, '_datablock_size', measurement_block.shape[1])
 
     def syndrome_from_history(self, history : Callable[[int], ArrayLike], readout : ArrayLike) -> ArrayLike:
         '''Convert a history of measurements to a spacetime syndrome'''
-        return _spacetime_syndrome(self._num_rounds, self.check_matrix, history, readout)
+        return _spacetime_syndrome(self._num_rounds, self._check_matrix, history, readout)
 
     def final_correction(self, spacetime_correction : ArrayLike) -> ArrayLike:
         '''Convert a correction of the spacetime code to a correction to the final round'''
-        num_qubits = self.check_matrix.shape[1]
+        num_qubits = self._check_matrix.shape[1]
         return sum(spacetime_correction[i*num_qubits : (i+1)*num_qubits] for i in range(self._num_rounds+1))%2
 
     def data_bits(self, x : ArrayLike) -> ArrayLike:
