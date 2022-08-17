@@ -66,7 +66,7 @@ sudo singularity build ldpc.sif exp_ldpc/ldpc.def
 
 ## Alternate Installation (Nix)
 A nix flake is provided:
-Use `nix develop .` to spawn a shell where the package is installed in the python interpreter or `nix run . --` to start the interpreter directly.
+Use `nix shell .` to spawn a shell where the package is installed in the python interpreter or `nix run . --` to start the interpreter directly.
 Use `nix run .#experiment` to spawn an interpreter with a few more useful packages.
 Alternatively, build your own python environment by supplying further python package overlays to the default package (see `flake.nix`).
 

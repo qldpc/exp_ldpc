@@ -14,14 +14,13 @@
             packageOverrides = pythonPackageOverlay;
           };
         in rec {
-          # Use nix run . to start a python interpreter with the package
+          # Basic python interpreter with qldpc package
           packages.default = python.withPackages (ps: [
             ps.qldpc
             ps.stim
             ps.pytest
           ]);
-
-          # Or add it to a python environment with other packages
+          # Add useful extra packages
           packages.experiment = python.withPackages (ps: [
             ps.qldpc
             ps.stim
