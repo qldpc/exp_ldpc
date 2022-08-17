@@ -141,8 +141,8 @@ def num_cols(a : np.array) -> int:
 
 def make_check_matrix(checks : Iterable[Iterable[int]], num_qubits) -> sparse.csr_matrix:
     '''Given check matrix specified as non-zero entries, construct a scipy sparse matrix'''
-    coo_entries = np.array([[row_index, v, 1] for (row_index, row) in enumerate(checks) for v in row])
-    return sparse.csr_matrix((coo_entries[:,2], (coo_entries[:,0], coo_entries[:,1])), shape=(len(checks), num_qubits), dtype=np.int32)
+    coo_entries = np.array([[row_index, v, 1] for (row_index, row) in enumerate(checks) for v in row], dtype=np.uint32)
+    return sparse.csr_matrix((coo_entries[:,2], (coo_entries[:,0], coo_entries[:,1])), shape=(len(checks), num_qubits), dtype=np.uint32)
 
 @dataclass(frozen=True)
 class StorageSim:
