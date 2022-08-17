@@ -66,8 +66,9 @@ sudo singularity build ldpc.sif exp_ldpc/ldpc.def
 
 ## Alternate Installation (Nix)
 A nix flake is provided:
-Use `nix develop` to spawn a shell where the package is installed in the python interpreter or `nix run` to start the interpreter directly.
-Alternatively, build your own python environment by supplying further python package overlays to the default package.
+Use `nix develop .` to spawn a shell where the package is installed in the python interpreter or `nix run . --` to start the interpreter directly.
+Use `nix run .#experiment` to spawn an interpreter with a few more useful packages.
+Alternatively, build your own python environment by supplying further python package overlays to the default package (see `flake.nix`).
 
 ## Generating a code and syndrome extraction circuit
 Try `python /scripts/generate_code_circuit.py --help` and `python /scripts/generate_code_circuit.py 4 3 12 --rounds 1 --save_code code.txt --save_circuit circuit.txt`

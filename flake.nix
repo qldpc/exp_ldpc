@@ -10,17 +10,28 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           pythonPackageOverlay = import ./packages; 
+          python = pkgs.python39.override {
+            packageOverrides = pythonPackageOverlay;
+          };
         in rec {
           # Use nix run . to start a python interpreter with the package
-          packages.default = (pkgs.callPackage ./default.nix { });
-          # Use nix develop . to drop into a shell
-          devShells.default = pkgs.mkShell {
-            buildInputs = [ packages.default ];
-          };
-          # Overlay for building your own python environment 
-          # Note this is an overlay of _python packages_
-          # See how it is used/added to in default.nix
-          overlays.default = pythonPackageOverlay;
+          packages.default = python.withPackages (ps: [
+            ps.qldpc
+            ps.stim
+            ps.pytest
+          ]);
+
+          # Or add it to a python environment with other packages
+          packages.experiment = python.withPackages (ps: [
+            ps.qldpc
+            ps.stim
+            ps.ldpc
+
+            ps.numpy
+            ps.pandas
+            ps.scipy
+            ps.matplotlib
+          ]);
         }
       );
 }
