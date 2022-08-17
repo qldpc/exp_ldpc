@@ -1,7 +1,7 @@
 from io import IOBase
 from scipy import sparse
 import numpy as np
-from .qecc_util import QuantumCodeChecks, make_check_matrix, num_rows, num_cols
+from .qecc_util import QuantumCodeChecks, QuantumCodeLogicals, make_check_matrix, num_rows, num_cols
 
 def read_check_generators(stream : IOBase, validate_stabilizer_code = None) -> QuantumCodeChecks:
     if validate_stabilizer_code is None:
@@ -53,6 +53,13 @@ def read_check_generators(stream : IOBase, validate_stabilizer_code = None) -> Q
             raise RuntimeError(f'X and Z checks do not generate an abelian group')
 
     return checks
+
+def read_logicals(stream : IOBase) -> QuantumCodeLogicals:
+    logicals_sparse = read_check_generators(stream, validate_stabilizer_code=False)
+    return QuantumCodeLogicals(logicals_sparse.x.todense(), logicals_sparse.z.todense())
+
+def write_logicals(stream : IOBase, logicals : QuantumCodeLogicals):
+    write_check_generators(stream, logicals)
 
 def write_check_generators(stream : IOBase, checks : QuantumCodeChecks):
 
