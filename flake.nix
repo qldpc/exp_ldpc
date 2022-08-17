@@ -10,13 +10,12 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           pythonPackageOverlay = import ./packages; 
-        in
-        {
+        in rec {
           # Use nix run . to start a python interpreter with the package
           packages.default = (pkgs.callPackage ./default.nix { });
           # Use nix develop . to drop into a shell
           devShells.default = pkgs.mkShell {
-            buildInputs = [ (pkgs.callPackage ./default.nix { }) ];
+            buildInputs = [ packages.default ];
           };
           # Overlay for building your own python environment 
           # Note this is an overlay of _python packages_
