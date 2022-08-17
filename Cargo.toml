@@ -1,6 +1,6 @@
 [package]
 name = "exp_ldpc"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2021"
 publish = false
 repository = "https://github.com/ChrisPattison/exp_ldpc"
