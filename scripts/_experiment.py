@@ -1,0 +1,148 @@
+import numpy as np
+from ldpc import bposd_decoder
+import stim
+import qldpc
+from qldpc import SpacetimeCode, SpacetimeCodeSingleShot
+from galois import GF2
+from functools import partial
+from dataclasses import dataclass
+from typing import Callable, Dict, Tuple
+
+
+@dataclass(frozen=True)
+class BPOSDCorrectSingleShot():
+    _bpd_final_round : None
+    _bpd_single_shot : None
+    _spacetime_code : None
+    _checks : None
+    _rounds : int
+
+    def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, bp_osd_options : Dict, priors : Tuple[float, float]):
+        data_prior, measurement_prior = priors
+
+        object.__setattr__(self, '_bpd_final_round', bposd_decoder(
+            code.checks.z,
+            error_rate = data_prior,
+            **bp_osd_options
+        ))
+
+        object.__setattr__(self, '_rounds', rounds)
+        object.__setattr__(self, '_checks', code.checks.z)
+        object.__setattr__(self, '_spacetime_code', SpacetimeCodeSingleShot(self._checks))
+
+        channel_prior = np.zeros(self._spacetime_code.spacetime_check_matrix.shape[1])
+        self._spacetime_code.data_bits(channel_prior)[:] = data_prior
+        self._spacetime_code.measurement_bits(channel_prior)[:] = measurement_prior
+    
+        object.__setattr__(self, '_bpd_single_shot', bposd_decoder(
+            self._spacetime_code.spacetime_check_matrix,
+            channel_probs = channel_prior,
+            **bp_osd_options))
+
+
+    def readout_correction(self, history : Callable[[int], np.array], data_readout : np.array) -> np.array:
+        accumulated_correction = np.zeros_like(data_readout, dtype=np.int32)
+        for t in range(self._rounds):
+            # Compute new syndrome after applying the current correction
+            correction_syndrome = (self._checks @ accumulated_correction)%2
+            syndrome = (correction_syndrome + history(t))%2
+
+            # Compute correction and add it to the current correction
+            correction = self._spacetime_code.final_correction(self._bpd_single_shot.decode(syndrome))
+            accumulated_correction = (accumulated_correction + correction)%2
+
+        # Correct the transverse readout
+        data_readout = (accumulated_correction + data_readout)%2
+
+        # Final round correction on read out data
+        syndrome = (self._checks @ data_readout)%2
+        final_correction = self._bpd_final_round.decode(syndrome)
+        return (final_correction + accumulated_correction)%2
+
+@dataclass
+class BPOSDCorrect():
+    _bpd : None
+    _spacetime_code : SpacetimeCode
+    _checks : None
+
+    def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, bp_osd_options : Dict, priors : Tuple[float, float]):
+        data_prior, measurement_prior = priors
+
+        object.__setattr__(self, '_checks', code.checks.z)
+        object.__setattr__(self, '_spacetime_code', SpacetimeCode(self._checks, rounds))
+
+        channel_prior = np.zeros(self._spacetime_code.spacetime_check_matrix.shape[1])
+        self._spacetime_code.data_bits(channel_prior)[:] = data_prior
+        self._spacetime_code.measurement_bits(channel_prior)[:] = measurement_prior
+        object.__setattr__(self, '_bpd', bposd_decoder(self._spacetime_code.spacetime_check_matrix, channel_prior=channel_prior, **bp_osd_options))
+
+
+    def readout_correction(self, history : Callable[[int], np.array], readout : np.array) -> np.array:
+        syndrome = self._spacetime_code.syndrome_from_history(history, readout)
+        correction = self._bpd.decode(syndrome)
+        return self._spacetime_code.final_correction(correction)
+
+        
+def run_simulation(samples, code, p_ph, bp_osd_options, rounds, single_shot):
+    
+    checks = code.checks
+    logicals = code.logicals
+
+    noise_model = qldpc.noise_model.depolarizing_noise(p_ph, p_ph)
+
+    # X / Z syndrome extraction circuit timesteps
+    x_steps = max(np.max(checks.x.sum(axis=0)), np.max(checks.x.sum(axis=1)))
+    z_steps = max(np.max(checks.z.sum(axis=0)), np.max(checks.z.sum(axis=1)))
+    
+    # Make this return a class
+    # Add X/Z syndrome extraction circuit depth
+    storage_sim = qldpc.build_storage_simulation(rounds, noise_model, checks, use_x_logicals = False)
+
+    meas_prior = p_ph*(2/3)
+    data_prior = p_ph*(2/3)
+
+    
+    sampler = stim.Circuit('\n'.join(storage_sim.circuit)).compile_sampler()
+
+    batch = sampler.sample(samples)
+    
+    # Add correct prior here 1/2 - (1-2p)^n/2
+    # Return measurment/data bits from spacetime code
+    decoder = (BPOSDCorrectSingleShot(code, rounds, bp_osd_options, (data_prior, meas_prior)) if single_shot 
+        else BPOSDCorrect(code, rounds, bp_osd_options, (data_prior, meas_prior)))
+
+    logical_values = []
+    for i in range(samples):
+        batch01 = np.where(batch[i], 1, 0)
+        data_readout = storage_sim.data_view(batch01)
+        history = partial(storage_sim.measurement_view, get_x_checks=False, measurement_vector=batch01)
+        data_readout = (data_readout + decoder.readout_correction(history, data_readout))%2
+        logical_values.append(np.any(GF2(logicals.z) @ GF2(data_readout) != 0))
+    return logical_values
+
+
+def add_bposd_args(parser):
+    '''Add arguments associated with BP+OSD to an ArgumentParser'''
+    parser.add_argument('--bposd_max_iter', type=lambda x: int(x) if x is not None else None, help='Maximum number of iterations for BP. Default is the number of qubits in the code', default=None)
+    parser.add_argument('--bposd_bp_method', choices=['ps', 'ms', 'msl'], help='BP method (product-sum, min-sum, min-sum log)', default='ps')
+    parser.add_argument('--bposd_ms_scaling_factor', type=float, help='Min sum scaling factor. Use variable scaling factor method if 0', default=0)
+    parser.add_argument('--bposd_osd_method', choices=['osd_e', 'osd_cs', 'osd0'], help='OSD method', default='osd_cs')
+    parser.add_argument('--bposd_osd_order', type=int, help='OSD search depth', default=7)
+
+def unpack_bposd_args(parsed_args, code):
+    '''Convert the BP+OSD command line arguments to the arguments passed to the BP+OSD decoder'''
+    return {
+        'max_iter':parsed_args.bposd_max_iter if parsed_args.bposd_max_iter is not None else code.checks.num_qubits,
+        'bp_method':parsed_args.bposd_bp_method,
+        'ms_scaling_factor':parsed_args.bposd_ms_scaling_factor,
+        'osd_method':parsed_args.bposd_osd_method, #the OSD method. Choose from:  1) "osd_e", "osd_cs", "osd0"
+        'osd_order':parsed_args.bposd_osd_order
+    }
+
+def load_code(args):
+    '''Load a code and its logicals from the command line arguments'''
+    with args.checks.open() as check_file:
+        checks = qldpc.read_check_generators(check_file, validate_stabilizer_code=True)
+    with args.logicals.open() as logicals_file:
+        logicals = qldpc.read_logicals(logicals_file)
+    return qldpc.QuantumCode(checks, logicals)
