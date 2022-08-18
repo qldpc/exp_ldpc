@@ -1,0 +1,8 @@
+git+ssh://git@github.com/qldpc/exp_ldpc@main#qldpc
+git+https://github.com/quantumgizmos/ldpc@main#ldpc
+stim
+pandas
+numpy
+matplotlib
+scipy
+galois
