@@ -25,6 +25,8 @@ pip install \
 numpy pandas scipy networkx matplotlib \
 stim pymatching
 
+pip install git+https://github.com/quantumgizmos/ldpc@main#ldpc
+
 pip install /base/scratch/exp_ldpc
 rm -r /base/scratch/exp_ldpc
 
