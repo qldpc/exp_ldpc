@@ -2,12 +2,14 @@ use error_correcting_code::{ErrorCorrectingCode,DecoderWrapper};
 use first_min_belief_prop::FirstMinBeliefProp;
 use first_min_bp_plus_ssf::FirstMinBPplusSSF;
 use small_set_flip::SmallSetFlip;
+use gf2_solve::row_reduce;
 use pyo3::prelude::*;
 
 mod small_set_flip;
 mod first_min_belief_prop;
 mod first_min_bp_plus_ssf;
 mod error_correcting_code;
+mod gf2_solve;
 
 #[pymodule]
 fn qldpc(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -16,6 +18,7 @@ fn qldpc(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<FirstMinBeliefProp>()?;
     m.add_class::<SmallSetFlip>()?;
     m.add_class::<FirstMinBPplusSSF>()?;
+    m.add_function(wrap_pyfunction!(row_reduce, m)?)?;
     Ok(())
 }
 

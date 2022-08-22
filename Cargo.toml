@@ -3,7 +3,7 @@ name = "exp_ldpc"
 version = "0.8.2"
 edition = "2021"
 publish = false
-repository = "https://github.com/ChrisPattison/exp_ldpc"
+repository = "https://github.com/qldpc/exp_ldpc"
 license = "MIT"
 
 authors = ["Chris Pattison <chpattison@gmail.com>"]
@@ -21,8 +21,9 @@ enum-as-inner = "0.3.3"
 rand = "0.8.3"
 rand_chacha = "0.3.1"
 rand_distr = "0.4.0"
-pyo3 = { version = "0.15.1", features = ["extension-module"] }
-numpy = "0.15.1"
+pyo3 = { version = "0.16.5", features = ["extension-module"] }
+numpy = "0.16.2"
+itertools = "0.10.3"
 
 [package.metadata.maturin]
 python-source = "python"
