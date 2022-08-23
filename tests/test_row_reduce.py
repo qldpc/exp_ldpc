@@ -3,8 +3,8 @@ import numpy as np
 
 def test_gf2_row_reduce():
     rand = np.random.default_rng(seed=412)
-    for rows in [2, 4, 8, 16, 32]:
-        for cols in [2, 4, 8, 16, 32]:
+    for rows in [2, 4, 8, 16, 17, 32]:
+        for cols in [2, 4, 8, 16, 17, 32]:
             for _ in range(200):
                 A = np.where(rand.random((rows, cols)) < 0.3, 1, 0).astype(np.uint8)
                 A = row_reduce(A)
@@ -23,3 +23,11 @@ def test_gf2_row_reduce():
                         if last_pivot_col is not None:
                             assert(next_pivot_col > last_pivot_col)
                         last_pivot_col = next_pivot_col
+
+
+def test_perf_gf2_row_reduce():
+    rand = np.random.default_rng(seed=412)
+    n = 8000
+    rows, cols = n, n
+    A = np.where(rand.random((rows, cols)) < 0.5, 1, 0).astype(np.uint8)
+    A = row_reduce(A)

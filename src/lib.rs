@@ -1,3 +1,5 @@
+#![feature(unchecked_math)]
+
 use error_correcting_code::{ErrorCorrectingCode,DecoderWrapper};
 use first_min_belief_prop::FirstMinBeliefProp;
 use first_min_bp_plus_ssf::FirstMinBPplusSSF;

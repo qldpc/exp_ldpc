@@ -1,7 +1,8 @@
 { lib
 , stdenv
 , buildPythonPackage
-, rustPlatform
+, makeRustPlatform
+, fenix
 , pytestCheckHook
 , numpy
 , scipy
@@ -10,7 +11,11 @@
 , libiconv
 }:
 
-buildPythonPackage rec {
+let
+  rustPlatform = makeRustPlatform {
+    inherit (fenix.complete) cargo rustc;
+  };
+in buildPythonPackage rec {
   pname = "qldpc";
   version = "0.8.2";
   format = "pyproject";
