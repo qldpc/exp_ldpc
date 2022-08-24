@@ -6,7 +6,6 @@ use numpy::{PyArray, PyArray2, PyReadonlyArray2};
 
 type Word = u64;
 const WORD_BITS : usize = Word::BITS as usize;
-type SimdWord = 
 
 #[derive(Debug, Clone, Copy)]
 struct ColSpec {
@@ -100,35 +99,24 @@ unsafe fn find_pivot(a : &Vec<Word>, lda : usize, start_row: usize, col : ColSpe
 
 #[inline(always)]
 unsafe fn reduce_col(a : &mut Vec::<Word>, lda : usize, cols : usize, pivot_src : usize, pivot_i : usize, pivot_j : ColSpec) {
-    for j in (pivot_j.word..cols).rev() {
-        // Inner loop of row reduction routine
-        // Swap the row pivot_src with pivot_row and then use pivot_row to reduce all the other entries in this column (may be bitpacked)
-
-        let pivot_row_data = *a.get_unchecked(pivot_src + j*lda);
-        // Do we need this check?
-        if pivot_src != pivot_i {
+    // Swap pivot if applicable
+    if pivot_src != pivot_i {
+        for j in (pivot_j.word..cols).rev() {
+            let pivot_row_data = *a.get_unchecked(pivot_src + j*lda);
             *a.get_unchecked_mut(pivot_src + j*lda) = *a.get_unchecked_mut(pivot_i + j*lda); 
             *a.get_unchecked_mut(pivot_i + j*lda) = pivot_row_data;
         }
+    }
 
-        let col_mask = (1 as Word).unchecked_shl(pivot_j.bit as Word);
-
-        // Manually duplicating this ends up being slightly faster (inhibited optimizations?)        
-        // Reduce stuff below the pivot
-        for i in pivot_i+1 .. lda {
-            if a.get_unchecked(i + pivot_j.word*lda).bitand(col_mask) != 0 {
+    let col_mask = (1 as Word).unchecked_shl(pivot_j.bit as Word);
+    for i in pivot_i+1 .. lda {
+        // Use sparsity to shortcut an O(n) step
+        if a.get_unchecked(i + pivot_j.word*lda).bitand(col_mask) != 0 {
+            for j in pivot_j.word..cols {
+                let pivot_row_data = *a.get_unchecked(pivot_src + j*lda);
                 a.get_unchecked_mut(i + j*lda).bitxor_assign(pivot_row_data);
-            }   
-        }
-
-        // Reduce stuff above the pivot
-        // TODO: Defer this until the end
-        for i in 0 .. pivot_i {
-            // If the bit in the pivot column is set, add the pivot row to this one
-            if a.get_unchecked(i + pivot_j.word*lda).bitand(col_mask) != 0 {
-                a.get_unchecked_mut(i + j*lda).bitxor_assign(pivot_row_data);
-            }        
-        }
+            }
+        } 
     }
 }
 
@@ -146,15 +134,22 @@ mod bench {
 
     #[bench]
     fn bench_gf2_row_reduce(bench : &mut Bencher) {
-        let n = 1024;
+        let sparsity = 0.005;
+        let n = 8192;
         let rows = n;
         let cols = (n+WORD_BITS-1)/WORD_BITS;
+        let lda = rows;
 
         let mut rng = ChaCha8Rng::seed_from_u64(0xeface14cd35a75b5);
 
+        // Generate matrix
         let mut data : Vec<Word> = vec![0; rows*cols];
-        for a in data.iter_mut(){
-            *a = rng.gen::<Word>();
+        for i in 0..rows {
+            for j in 0..cols {
+                data[i + j*lda] = (0usize..WORD_BITS)
+                    .map(|k| if rng.gen::<f64>() < sparsity { 1 << k } else { 0 })
+                    .fold(0, |a, b| a.bitor(b));
+            }
         }
 
         bench.iter(|| unsafe {
