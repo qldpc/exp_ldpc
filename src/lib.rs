@@ -1,4 +1,6 @@
 #![feature(unchecked_math)]
+#![feature(test)]
+#![feature(portable_simd)]
 
 use error_correcting_code::{ErrorCorrectingCode,DecoderWrapper};
 use first_min_belief_prop::FirstMinBeliefProp;

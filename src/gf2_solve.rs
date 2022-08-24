@@ -4,8 +4,15 @@ use pyo3::prelude::*;
 use numpy::ndarray::Array2;
 use numpy::{PyArray, PyArray2, PyReadonlyArray2};
 
-type Word = u128;
+type Word = u64;
 const WORD_BITS : usize = Word::BITS as usize;
+type SimdWord = 
+
+#[derive(Debug, Clone, Copy)]
+struct ColSpec {
+    word : usize,
+    bit  : usize,
+}
 
 #[pyfunction]
 pub fn row_reduce<'py>(py: Python<'py>, py_a : PyObject) -> PyResult<&'py PyArray2<u8>> {
@@ -53,15 +60,19 @@ pub fn row_reduce<'py>(py: Python<'py>, py_a : PyObject) -> PyResult<&'py PyArra
 // But each word is bit-packed entries of a row
 // No bitpacking for now
 #[inline(never)]
+#[target_feature(enable = "avx")]
+#[target_feature(enable = "avx2")]
+#[target_feature(enable = "bmi2")]
 unsafe fn _row_reduce(a : &mut Vec::<Word>, lda : usize, col_words : usize, last_word_cols : usize) {
     let num_cols = (col_words-1)*WORD_BITS + last_word_cols;
     // Row to put the pivot on
     let mut r = 0usize;
     for k in 0usize..col_words {
         for k_bit in if k+1 < col_words { 0usize..WORD_BITS } else { 0usize..last_word_cols } {
-            let pivot = find_pivot(a, lda, k, k_bit, r);
+            let k_col_spec = ColSpec{word:k, bit:k_bit};
+            let pivot = find_pivot(a, lda, r, k_col_spec);
             if let Some(pivot_src) = pivot {
-                reduce_col(a, lda, col_words, pivot_src, (r, k), k_bit);
+                reduce_col(a, lda, col_words, pivot_src, r, k_col_spec);
                 r += 1;
             }
 
@@ -75,49 +86,81 @@ unsafe fn _row_reduce(a : &mut Vec::<Word>, lda : usize, col_words : usize, last
 // TODO: Is this index arithemtic checked?
 
 /// Find a pivot row in col in the range [start_row, lda)
-#[inline]
-unsafe fn find_pivot(a : &Vec<Word>, lda : usize, col : usize, col_bit : usize, start_row: usize) -> Option<usize> {
+#[inline(always)]
+unsafe fn find_pivot(a : &Vec<Word>, lda : usize, start_row: usize, col : ColSpec) -> Option<usize> {
     // TODO: Rewrite this to not be ugly
-    let col_mask = (1 as Word).unchecked_shl(col_bit as Word);
+    let col_mask = (1 as Word).unchecked_shl(col.bit as Word);
     for i in start_row..lda {
-        if a.get_unchecked(i + col*lda).bitand(col_mask) != 0 {
+        if a.get_unchecked(i + col.word*lda).bitand(col_mask) != 0 {
             return Some(i);
         }
     }
     None
 }
 
-#[inline]
-unsafe fn reduce_col(a : &mut Vec::<Word>, lda : usize, cols : usize, pivot_src : usize, (pivot_i, pivot_j) : (usize, usize), pivot_j_bit : usize) {
-    for j in (pivot_j..cols).rev() {
-        reduce_col_inner(a, lda, j, pivot_src, (pivot_i, pivot_j), pivot_j_bit);
+#[inline(always)]
+unsafe fn reduce_col(a : &mut Vec::<Word>, lda : usize, cols : usize, pivot_src : usize, pivot_i : usize, pivot_j : ColSpec) {
+    for j in (pivot_j.word..cols).rev() {
+        // Inner loop of row reduction routine
+        // Swap the row pivot_src with pivot_row and then use pivot_row to reduce all the other entries in this column (may be bitpacked)
+
+        let pivot_row_data = *a.get_unchecked(pivot_src + j*lda);
+        // Do we need this check?
+        if pivot_src != pivot_i {
+            *a.get_unchecked_mut(pivot_src + j*lda) = *a.get_unchecked_mut(pivot_i + j*lda); 
+            *a.get_unchecked_mut(pivot_i + j*lda) = pivot_row_data;
+        }
+
+        let col_mask = (1 as Word).unchecked_shl(pivot_j.bit as Word);
+
+        // Manually duplicating this ends up being slightly faster (inhibited optimizations?)        
+        // Reduce stuff below the pivot
+        for i in pivot_i+1 .. lda {
+            if a.get_unchecked(i + pivot_j.word*lda).bitand(col_mask) != 0 {
+                a.get_unchecked_mut(i + j*lda).bitxor_assign(pivot_row_data);
+            }   
+        }
+
+        // Reduce stuff above the pivot
+        // TODO: Defer this until the end
+        for i in 0 .. pivot_i {
+            // If the bit in the pivot column is set, add the pivot row to this one
+            if a.get_unchecked(i + pivot_j.word*lda).bitand(col_mask) != 0 {
+                a.get_unchecked_mut(i + j*lda).bitxor_assign(pivot_row_data);
+            }        
+        }
     }
 }
 
-/// Inner loop of row reduction routine
-/// Swap the row pivot_src with pivot_row and then use pivot_row to reduce all the other entries in this column (may be bitpacked)
-#[inline]
-unsafe fn reduce_col_inner(a : &mut Vec::<Word>, lda : usize, col : usize, pivot_src : usize, (pivot_i, pivot_j) : (usize, usize), pivot_j_bit : usize) {
-    let pivot_row_data = *a.get_unchecked(pivot_src + col*lda);
-    // Do we need this check?
-    if pivot_src != pivot_i {
-        *a.get_unchecked_mut(pivot_src + col*lda) = *a.get_unchecked_mut(pivot_i + col*lda); 
-        *a.get_unchecked_mut(pivot_i + col*lda) = pivot_row_data;
-    }
+#[cfg(test)]
+mod bench {
+    use super::*;
+    use test::Bencher;
 
-    let col_mask = (1 as Word).unchecked_shl(pivot_j_bit as Word);
+    use rand::SeedableRng;
+    use rand::Rng;
+    use rand_chacha::ChaCha8Rng;
 
-    // Manually duplicating this ends up being slightly faster (inhibited optimizations?)
-    for i in 0 .. pivot_i {
-        // If the bit in the pivot column is set, add the pivot row to this one
-        if a.get_unchecked(i + pivot_j*lda).bitand(col_mask) != 0 {
-            a.get_unchecked_mut(i + col*lda).bitxor_assign(pivot_row_data);
-        }        
-    }
+    extern crate test;
 
-    for i in pivot_i+1 .. lda {
-        if a.get_unchecked(i + pivot_j*lda).bitand(col_mask) != 0 {
-            a.get_unchecked_mut(i + col*lda).bitxor_assign(pivot_row_data);
-        }   
+
+    #[bench]
+    fn bench_gf2_row_reduce(bench : &mut Bencher) {
+        let n = 1024;
+        let rows = n;
+        let cols = (n+WORD_BITS-1)/WORD_BITS;
+
+        let mut rng = ChaCha8Rng::seed_from_u64(0xeface14cd35a75b5);
+
+        let mut data : Vec<Word> = vec![0; rows*cols];
+        for a in data.iter_mut(){
+            *a = rng.gen::<Word>();
+        }
+
+        bench.iter(|| unsafe {
+                _row_reduce(&mut data, rows, cols-1, WORD_BITS)
+            }
+        );
+        assert!(data.iter().sum::<Word>() > 0);
     }
 }

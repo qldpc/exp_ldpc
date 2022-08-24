@@ -40,6 +40,14 @@
             ps.scipy
             ps.matplotlib
           ]);
+
+          packages.rust = (pkgs.fenix.complete.withComponents [
+            "cargo"
+            "clippy"
+            "rust-src"
+            "rustc"
+            "rustfmt"
+          ]);
         }
       );
 }
