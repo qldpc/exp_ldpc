@@ -6,7 +6,6 @@ use numpy::{PyArray, PyArray2, PyReadonlyArray2};
 
 type Word = u64;
 const WORD_BITS : usize = Word::BITS as usize;
-type SimdWord = 
 
 #[derive(Debug, Clone, Copy)]
 struct ColSpec {
@@ -146,15 +145,22 @@ mod bench {
 
     #[bench]
     fn bench_gf2_row_reduce(bench : &mut Bencher) {
-        let n = 1024;
+        let sparsity = 0.01;
+        let n = 2048;
         let rows = n;
         let cols = (n+WORD_BITS-1)/WORD_BITS;
+        let lda = rows;
 
         let mut rng = ChaCha8Rng::seed_from_u64(0xeface14cd35a75b5);
 
+        // Generate matrix
         let mut data : Vec<Word> = vec![0; rows*cols];
-        for a in data.iter_mut(){
-            *a = rng.gen::<Word>();
+        for i in 0..rows {
+            for j in 0..cols {
+                data[i + j*lda] = (0usize..WORD_BITS)
+                    .map(|k| if rng.gen::<f64>() < sparsity { 1 << k } else { 0 })
+                    .fold(0, |a, b| a.bitor(b));
+            }
         }
 
         bench.iter(|| unsafe {
