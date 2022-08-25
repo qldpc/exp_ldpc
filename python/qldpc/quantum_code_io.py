@@ -40,9 +40,6 @@ def read_check_generators(stream : IOBase, validate_stabilizer_code = None) -> Q
         
     if len(z_checks) + len(x_checks) != check_count:
         raise RuntimeError(f'Number of checks does not match parsed number of lines')
-
-    if len(z_checks) != len(x_checks):
-        raise RuntimeError(f' Number of X checks does not match number of Z checks, got {x_checks} and {z_checks} respectively.')
     
     x_checks = make_check_matrix(x_checks, qubit_count)
     z_checks = make_check_matrix(z_checks, qubit_count)
