@@ -49,26 +49,29 @@ def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[CircuitTargets, L
     # Init X check ancillas
     circuit.append(f'RX {x_check_ancilla_str}')
     circuit.append('TICK') # --------
+
+    if x_check_count > 0:
     # X check circuit
-    for round in x_check_schedule:
-        circuit.extend(f'CX {x_check_ancillas[check]} {target}' for (check, target) in round.items())
-        circuit.append('TICK') # --------
-    # Measurep
-    circuit.append(f'MRX {x_check_ancilla_str}')
+        for round in x_check_schedule:
+            circuit.extend(f'CX {x_check_ancillas[check]} {target}' for (check, target) in round.items())
+            circuit.append('TICK') # --------
+        # Measure
+        circuit.append(f'MRX {x_check_ancilla_str}')
     
     # Init Z check ancillas in parallel with X check measurements
     circuit.append(f'RX {z_check_ancilla_str}')
     circuit.append('TICK') # --------
 
-    for round in z_check_schedule:
-        circuit.extend(f'CZ {z_check_ancillas[check]} {target}' for (check, target) in round.items())
-        circuit.append('TICK') # --------
+    if z_check_count > 0:
+        for round in z_check_schedule:
+            circuit.extend(f'CZ {z_check_ancillas[check]} {target}' for (check, target) in round.items())
+            circuit.append('TICK') # --------
 
-    circuit.append(f'MRX {z_check_ancilla_str}')
+        circuit.append(f'MRX {z_check_ancilla_str}')
 
     # Leave off the final tick so we can interleave this element
     # circuit.append('TICK')  # --------
-    return (CircuitTargets(list(range(num_data_qubits)), x_check_ancillas, z_check_ancillas), circuit)
+    return (CircuitTargets(list(range(num_data_qubits)), list(x_check_ancillas), list(z_check_ancillas)), circuit)
 
 noise_channels = (
     'CORRELATED_ERROR',
@@ -116,7 +119,9 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, checks :
     # Ensure the indices are contiguous since we will assume this later
     assert all(targets.x_checks[i+1] == targets.x_checks[i] + 1 for i in range(len(targets.x_checks)-1))
     assert all(targets.z_checks[i+1] == targets.z_checks[i] + 1 for i in range(len(targets.z_checks)-1))
-    assert targets.z_checks[0] == targets.x_checks[-1]+1
+
+    if len(targets.z_checks) > 0 and len(targets.x_checks) > 0:
+        assert targets.z_checks[0] == targets.x_checks[-1]+1
     
     x_check_count = len(targets.x_checks)
     z_check_count = len(targets.z_checks)
