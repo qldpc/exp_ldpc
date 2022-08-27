@@ -59,7 +59,7 @@ dependencies = [
 
 [[package]]
 name = "exp_ldpc"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "enum-as-inner",
  "numpy",
