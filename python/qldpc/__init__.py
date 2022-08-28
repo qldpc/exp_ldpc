@@ -9,6 +9,7 @@ from .qecc_util import GF2, QuantumCode, QuantumCodeChecks, QuantumCodeLogicals,
 from .spacetime_code import SpacetimeCode, SpacetimeCodeSingleShot
 from . import noise_model
 from . import code_examples
+from . import lifted_product_code
 
 # Import decoders but don't blow up if we want to use some of the other routines without compiling the decoder library
 import warnings

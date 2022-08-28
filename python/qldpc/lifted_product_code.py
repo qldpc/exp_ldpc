@@ -261,8 +261,8 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
         double_cover = True
 
     w = len(gen)
-    assert w == h1.shape[1]
-    assert w == h2.shape[1]
+    assert w*2 == h1.shape[1]
+    assert w*2 == h2.shape[1]
 
     vertices = [0,1] if double_cover else [0]
     edge_boundaries = [(0,0), (1,1)] if double_cover else [(0,0), (0,1)]
@@ -283,12 +283,12 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
         # v1 is either 0 or 1 so we abuse notation and raise the shift to it
         x_check.extend(
             VertexVertex((v1, r1), gen[e1]**orient @ g, (v2, r2))
-            for r1 in h1_system for v1, orient in edge_boundaries if h1[r1,e1] != 0)
+            for r1 in h1_system for v1, orient in edge_boundaries if h1[r1,e1+orient*w] != 0)
 
         # ExV -> ExE
         x_check.extend(
             EdgeEdge(e1, g @ gen[e2].inv()**orient, e2)
-            for e2, orient in vertex_coboundary(v2) if h2[r2,e2] != 0)
+            for e2, orient in vertex_coboundary(v2) if h2[r2,e2+orient*w] != 0)
 
         x_supports[EdgeVertex(e1,g,(v2,r2))] = x_check
     
@@ -298,14 +298,14 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
     for (e1, g, e2) in product(edges, group, edges):
         support = deque()
         support.extend( VertexEdge((v1, r1), gen[e1]**orient @ g, e2)
-                        for r1 in h1_system if h1[r1, e1] != 0 for v1, orient in edge_boundaries)
+                        for r1 in h1_system for v1, orient in edge_boundaries if h1[r1, e1+orient*w] != 0)
 
         q_supports[EdgeEdge(e1,g,e2)] = support
 
     # VxV -> VxE
     for (v1, r1, g, v2, r2) in product(vertices, h1_system, group, vertices, h2_system):
         support = deque()
-        support.extend( VertexEdge((v1, r1), g @ gen[e2].inv()**orient, e2) for e2, orient in vertex_coboundary(v2) if h2[r2,e2] != 0)
+        support.extend( VertexEdge((v1, r1), g @ gen[e2].inv()**orient, e2) for e2, orient in vertex_coboundary(v2) if h2[r2,e2+orient*w] != 0)
         
         q_supports[VertexVertex((v1, r1), g, (v2, r2))] = support
 
@@ -386,7 +386,7 @@ def lifted_product_code_cyclic(q, m, w, r, compute_logicals=None, r2=None, seed=
             raise ValueError('Need an even degree for the Cayley graph when not using the double cover')
         w = w // 2
         
-    generators = random_abelian_generators(q, m, w, seed=seed)
+    generators = random_abelian_generators(q, m, w//2, seed=seed)
     return _lifted_product_code_wrapper(generators, r, compute_logicals=compute_logicals, r2=r2, seed=seed, check_complex=check_complex, double_cover=double_cover)
 
 def lifted_product_code_pgl2(l, i, r, *args, **kwargs):
