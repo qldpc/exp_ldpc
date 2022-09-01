@@ -288,7 +288,7 @@ def lifted_product_code(group : List[Group], generators : List[Group], h1, h2, c
     h1_system = list(range(h1.shape[0]))
     h2_system = list(range(h2.shape[0]))
 
-    # Supports of X checks
+    # ============= Supports of X checks =============
     x_supports = dict()
     for (e1, v2, r2, g) in product(base_graph.edges(data=True), base_graph.nodes, h2_system, group):
         x_check = deque()
@@ -317,7 +317,7 @@ def lifted_product_code(group : List[Group], generators : List[Group], h1, h2, c
 
         x_supports[EdgeVertex(_unpack_edge(e1),g,(v2,r2))] = x_check
 
-    # Supports of each qubit within a Z check
+    # ============= Supports of each qubit within a Z check =============
     q_supports = dict()
     # ExE -> VxE
     for (e1, g, e2) in product(base_graph.edges(data=True), group, base_graph.edges(data=True)):
@@ -326,7 +326,7 @@ def lifted_product_code(group : List[Group], generators : List[Group], h1, h2, c
         support.extend(VertexEdge((v1, r1), e1[2]['g'] @ g, _unpack_edge(e2))
             for r1 in h1_system if h1[r1, base_graph.nodes[v1]['in_idx'][_unpack_edge(e1)]] != 0)
 
-        support.extend(VertexEdge((u1, r1), e1[2]['g'] @ g, _unpack_edge(e2))
+        support.extend(VertexEdge((u1, r1), g, _unpack_edge(e2))
             for r1 in h1_system if h1[r1, base_graph.nodes[u1]['out_idx'][_unpack_edge(e1)]] != 0)
 
         q_supports[EdgeEdge(_unpack_edge(e1),g,_unpack_edge(e2))] = support
@@ -339,7 +339,8 @@ def lifted_product_code(group : List[Group], generators : List[Group], h1, h2, c
         
         q_supports[VertexVertex((v1, r1), g, (v2, r2))] = support
 
-    
+    # ============= Convert to check matrices =============
+
     # Create indices for everything
     swap = lambda x: (x[1],x[0])
     x_check_indices = dict(map(swap, enumerate(x_supports.keys())))

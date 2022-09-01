@@ -32,13 +32,14 @@ def test_lifted_product_code_cyclic():
     code = lifted_product_code_cyclic(q=q, m=m, w=w, r=r, double_cover=True, compute_logicals=True, seed=42, check_complex=True)
     checks = code.checks
     logicals = code.logicals
+
     assert checks.num_qubits == (w**2 + 4*r**2)*G
     assert logicals.x.shape[0] >= checks.num_qubits - 2* (2*w*r*G)
 
 def test_lifted_product_code_cyclic_Bw():
     # Don't use the double cover
     # Parameters from Higgot and Breuckmann
-    w = 14
+    w = 7
     r = 5
     q = 22
     m = 1
@@ -46,8 +47,9 @@ def test_lifted_product_code_cyclic_Bw():
     code = lifted_product_code_cyclic(q=q, m=m, w=w, r=r, double_cover=False, compute_logicals=True, seed=42, check_complex=True)
     checks = code.checks
     logicals = code.logicals
-    assert checks.num_qubits == (w**2//4 + r**2)*G
-    assert logicals.x.shape[0] >= checks.num_qubits - w*r*G
+
+    assert checks.num_qubits == ((w*2)**2//4 + r**2)*G
+    assert logicals.x.shape[0] >= checks.num_qubits - (w*2)*r*G
     
 def test_lifted_product_code_pgl2_Bw():
     # The local code length is probably too short here
