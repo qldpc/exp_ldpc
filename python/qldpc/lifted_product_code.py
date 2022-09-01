@@ -235,7 +235,7 @@ class VertexEdge:
 def _unpack_edge(edge : Tuple(int, int, dict)) -> Tuple(int, int, Group):
     return (edge[0], edge[1], edge[2]['g'], edge[2]['idx'])
 
-def lifted_product_code(group : List[Group], generators : List[Group], h1, h2, check_complex = None, compute_logicals = None, double_cover = None) -> QuantumCode:
+def lifted_product_code(group : List[Group], generators : List[Group], h1, h2, check_complex = None, compute_logicals = None, double_cover = None, base_graph : nx.MultiDiGraph = None) -> QuantumCode:
     '''
     group object must implement __mul__ and inv()
         
@@ -247,6 +247,8 @@ def lifted_product_code(group : List[Group], generators : List[Group], h1, h2, c
     The right factor group action is from the right
 
     gen isomorphic to the number of outgoing edges in the base graph I.e. |gen| = w and base graph is B_w or D_w
+
+    A base graph can be manually specified. It must be a regular directed digraph. Each each must have a 'g' key corresponding to the generator to use and a unique 'idx' key.
     '''
 
     warnings.warn('Lifted Product codes is experimental!')
@@ -264,14 +266,15 @@ def lifted_product_code(group : List[Group], generators : List[Group], h1, h2, c
         raise ValueError('Local code block lengths must match. (For now)')
 
     # Make base graph
-    # We put an extra index i here to identify duplicate generators
-    base_graph = nx.MultiDiGraph()
-    if double_cover:
-        base_graph.add_nodes_from([0,1])
-        base_graph.add_edges_from((0,1,{'g':g,'idx':i}) for i, g in enumerate(generators))
-    else:
-        base_graph.add_node(0)
-        base_graph.add_edges_from((0,0,{'g':g,'idx':i}) for i, g in enumerate(generators))
+    if base_graph is None:
+        # We put an extra index i here to identify duplicate generators
+        base_graph = nx.MultiDiGraph()
+        if double_cover:
+            base_graph.add_nodes_from([0,1])
+            base_graph.add_edges_from((0,1,{'g':g,'idx':i}) for i, g in enumerate(generators))
+        else:
+            base_graph.add_node(0)
+            base_graph.add_edges_from((0,0,{'g':g,'idx':i}) for i, g in enumerate(generators))
 
     # Indices that we will use to index into the local system
     # We need to seperately index in and out edges because an edge could be a self edge, so it would appear in the local system twice
