@@ -22,6 +22,18 @@ def test_morgenstern_generators():
     # Do DFS using the generators from the left and from the right to make sure we get the number of elements we expect
     # Check a \in A implies a^-1 \in A
 
+def test_morgenstern_B_generators():
+    l = 1
+    i = 2
+    generators = morgenstern_generators(l,i, use_B_generators=True, symmetric=True)
+    identity = generators[0].identity()
+    A_gen_len = 2**l + 1
+    assert len(generators) == A_gen_len*(A_gen_len-1)
+    
+    group_elements = _dfs_generators(identity, generators)
+    q = (2**l)**i
+    assert len(group_elements) == (q-1)*q*(q+1)
+
 def test_lifted_product_code_cyclic():
     # Parameters from Higgot and Breuckmann
     w = 14

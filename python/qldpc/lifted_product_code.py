@@ -158,10 +158,19 @@ def random_abelian_generators(q, m, k, symmetric=None, seed=None):
         generators = list(chain(*[[g, g.inv()] for g in generators]))
     return generators
     
-def morgenstern_generators(l, i) -> List[PGL2]:
+def morgenstern_generators(l, i, use_B_generators = None, symmetric = None) -> List[PGL2]:
     '''Construct the Morgenstern generators for PGL(2,q^i) with q = 2^l
     This follows the overview in Dinur et al. (2021) arXiv:2111.04808
+    If using the B generators, we will return the alternate set of generators {ab | a, b \in A, a != b} from the original generating set
+    Since the A generators satisfy a^2 = 1, the inverses of the B generators are (ab)^-1 = ba
+    If symmetric is false then we will not include inverses
     '''
+    if symmetric is None:
+        symmetric = True
+
+    if use_B_generators is None:
+        use_B_generators = False
+
     assert l >= 1
     # # This restriction is required by the text
     # assert l % 2 == 0
@@ -183,6 +192,10 @@ def morgenstern_generators(l, i) -> List[PGL2]:
     assert len(pairs) == q+1
     x = Fqi.primitive_element # Is this right?
     generators = [PGL2(Fqi, [[1, (g+d*i_element)],[x*(g+d+d*i_element), 1]]) for (g,d) in pairs]
+    
+    if use_B_generators:
+        generators = [a@b for i, a in enumerate(generators) for j, b in enumerate(generators) if i!=j and (i<j or symmetric)]
+
     return generators
 
 def _dfs_generators(root : Group, generators : List[Group], traverse=None) -> Set[Group]:
