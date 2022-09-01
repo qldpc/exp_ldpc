@@ -1,4 +1,5 @@
 from __future__ import annotations
+from multiprocessing.sharedctypes import Value
 
 from .homological_product_code import get_logicals
 import numpy as np
@@ -8,6 +9,7 @@ import scipy.sparse as sparse
 from itertools import product, chain
 from collections import deque
 import warnings
+import networkx as nx
 
 from typing import List, Set, Tuple
 from dataclasses import dataclass
@@ -229,8 +231,11 @@ class VertexEdge:
     g: Group
     e: int
 
-    
-def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_complex = None, compute_logicals = None, double_cover = None) -> QuantumCode:
+# networkx edges are unhashable because the weights are a dict
+def _unpack_edge(edge : Tuple(int, int, dict)) -> Tuple(int, int, Group):
+    return (edge[0], edge[1], edge[2]['g'], edge[2]['idx'])
+
+def lifted_product_code(group : List[Group], generators : List[Group], h1, h2, check_complex = None, compute_logicals = None, double_cover = None) -> QuantumCode:
     '''
     group object must implement __mul__ and inv()
         
@@ -241,12 +246,7 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
     The left factor group action is from the left
     The right factor group action is from the right
 
-    The generator set will be extended to contain inverses in the construction
-    
-    double_cover=False uses the Bouquet graph as the base graph so the Tanner code is on the Cayley graph
-    If double_cover is false we must also have that forall a \\in S, a /= a^-1
-    
-    double_cover=True uses a multigraph with w edges and 2 vertices so the Tanner code is on the double cover of the Cayley graph
+    gen isomorphic to the number of outgoing edges in the base graph I.e. |gen| = w and base graph is B_w or D_w
     '''
 
     warnings.warn('Lifted Product codes is experimental!')
@@ -260,60 +260,91 @@ def lifted_product_code(group : List[Group], gen : List[Group], h1, h2, check_co
     if double_cover is None:
         double_cover = True
 
-    w = len(gen)
-    assert w*2 == h1.shape[1]
-    assert w*2 == h2.shape[1]
+    if h1.shape[1] != h2.shape[1]:
+        raise ValueError('Local code block lengths must match. (For now)')
 
-    vertices = [0,1] if double_cover else [0]
-    edge_boundaries = [(0,0), (1,1)] if double_cover else [(0,0), (0,1)]
-    # we need to track orientation more carefully without the double cover
-    vertex_coboundary = lambda v: [(e,v) for e in edges] if double_cover else [(e,o) for e in edges for o in (0,1)]
+    # Make base graph
+    # We put an extra index i here to identify duplicate generators
+    base_graph = nx.MultiDiGraph()
+    if double_cover:
+        base_graph.add_nodes_from([0,1])
+        base_graph.add_edges_from((0,1,{'g':g,'idx':i}) for i, g in enumerate(generators))
+    else:
+        base_graph.add_node(0)
+        base_graph.add_edges_from((0,0,{'g':g,'idx':i}) for i, g in enumerate(generators))
+
+    # Indices that we will use to index into the local system
+    # We need to seperately index in and out edges because an edge could be a self edge, so it would appear in the local system twice
+    for v in base_graph.nodes:
+        base_graph.nodes[v]['out_idx'] = {_unpack_edge(e):i for i, e in enumerate(base_graph.out_edges(v, data=True))}
+        in_indices_offset = len(base_graph.nodes[v]['out_idx'])
+        base_graph.nodes[v]['in_idx'] = {_unpack_edge(e):(i+in_indices_offset) for i, e in enumerate(base_graph.in_edges(v, data=True))}
+
+        if len(base_graph.nodes[v]['out_idx']) + len(base_graph.nodes[v]['in_idx']) != h1.shape[1]:
+            print(f"{len(base_graph.nodes[v]['out_idx']) + len(base_graph.nodes[v]['in_idx'])=}, {h1.shape[1]=}")
+            raise ValueError('Local code block length does not match base graph degree')
     
-    edges = list(range(w))
-
+    # local system indices
     h1_system = list(range(h1.shape[0]))
     h2_system = list(range(h2.shape[0]))
 
-    # Support of X check
+    # Supports of X checks
     x_supports = dict()
-    for (e1, g, v2, r2) in product(edges, group, vertices, h2_system):
+    for (e1, v2, r2, g) in product(base_graph.edges(data=True), base_graph.nodes, h2_system, group):
         x_check = deque()
         # ExV -> VxV
-        # Remembering the local system for E -> V
-        # v1 is either 0 or 1 so we abuse notation and raise the shift to it
+        # Edge endpoints
+        u1,v1 = e1[:2]
+
+        # ->(v1) of e1
         x_check.extend(
-            VertexVertex((v1, r1), gen[e1]**orient @ g, (v2, r2))
-            for r1 in h1_system for v1, orient in edge_boundaries if h1[r1,e1+orient*w] != 0)
+            VertexVertex((v1, r1), e1[2]['g'] @ g, (v2, r2))
+            for r1 in h1_system if h1[r1,base_graph.nodes[v1]['in_idx'][_unpack_edge(e1)]] != 0)
+        # (u1)-> of e1
+        x_check.extend(
+            VertexVertex((u1, r1), g, (v2, r2))
+            for r1 in h1_system if h1[r1,base_graph.nodes[u1]['out_idx'][_unpack_edge(e1)]] != 0)
 
         # ExV -> ExE
+        # Out edges
         x_check.extend(
-            EdgeEdge(e1, g @ gen[e2].inv()**orient, e2)
-            for e2, orient in vertex_coboundary(v2) if h2[r2,e2+orient*w] != 0)
+            EdgeEdge(_unpack_edge(e1), g, _unpack_edge(e2))
+            for e2 in base_graph.out_edges(v2, data=True) if h2[r2, base_graph.nodes[v2]['out_idx'][_unpack_edge(e2)]] != 0)
+        # In edges 
+        x_check.extend(
+            EdgeEdge(_unpack_edge(e1), g @ e2[2]['g'].inv(), _unpack_edge(e2))
+            for e2 in base_graph.in_edges(v2, data=True) if h2[r2, base_graph.nodes[v2]['in_idx'][_unpack_edge(e2)]] != 0)
 
-        x_supports[EdgeVertex(e1,g,(v2,r2))] = x_check
-    
+        x_supports[EdgeVertex(_unpack_edge(e1),g,(v2,r2))] = x_check
+
     # Supports of each qubit within a Z check
     q_supports = dict()
     # ExE -> VxE
-    for (e1, g, e2) in product(edges, group, edges):
+    for (e1, g, e2) in product(base_graph.edges(data=True), group, base_graph.edges(data=True)):
         support = deque()
-        support.extend( VertexEdge((v1, r1), gen[e1]**orient @ g, e2)
-                        for r1 in h1_system for v1, orient in edge_boundaries if h1[r1, e1+orient*w] != 0)
+        u1,v1 = e1[:2]
+        support.extend(VertexEdge((v1, r1), e1[2]['g'] @ g, _unpack_edge(e2))
+            for r1 in h1_system if h1[r1, base_graph.nodes[v1]['in_idx'][_unpack_edge(e1)]] != 0)
 
-        q_supports[EdgeEdge(e1,g,e2)] = support
+        support.extend(VertexEdge((u1, r1), e1[2]['g'] @ g, _unpack_edge(e2))
+            for r1 in h1_system if h1[r1, base_graph.nodes[u1]['out_idx'][_unpack_edge(e1)]] != 0)
+
+        q_supports[EdgeEdge(_unpack_edge(e1),g,_unpack_edge(e2))] = support
 
     # VxV -> VxE
-    for (v1, r1, g, v2, r2) in product(vertices, h1_system, group, vertices, h2_system):
+    for (v1, r1, g, v2, r2) in product(base_graph.nodes, h1_system, group, base_graph.nodes, h2_system):
         support = deque()
-        support.extend( VertexEdge((v1, r1), g @ gen[e2].inv()**orient, e2) for e2, orient in vertex_coboundary(v2) if h2[r2,e2+orient*w] != 0)
+        support.extend( VertexEdge((v1, r1), g, _unpack_edge(e2)) for e2 in base_graph.out_edges(v2, data=True) if h2[r2, base_graph.nodes[v2]['out_idx'][_unpack_edge(e2)]] != 0)
+        support.extend( VertexEdge((v1, r1), g @ e2[2]['g'].inv(), _unpack_edge(e2)) for e2 in base_graph.in_edges(v2, data=True) if h2[r2, base_graph.nodes[v2]['in_idx'][_unpack_edge(e2)]] != 0)
         
         q_supports[VertexVertex((v1, r1), g, (v2, r2))] = support
 
+    
     # Create indices for everything
     swap = lambda x: (x[1],x[0])
     x_check_indices = dict(map(swap, enumerate(x_supports.keys())))
     qubit_indices = dict(map(swap, enumerate(q_supports.keys())))
-    z_check_indices = dict(map(swap, enumerate(VertexEdge((v1, r1), g, e2) for (v1, r1, g, e2) in product(vertices, h1_system, group, edges))))
+    z_check_indices = dict(map(swap, enumerate(VertexEdge((v1, r1), g, _unpack_edge(e2)) for (v1, r1, g, e2) in product(base_graph.nodes, h1_system, group, base_graph.edges(data=True)))))
 
     def coo_entries(coords):
         I = [x[0] for x in coords]
@@ -362,12 +393,13 @@ def _lifted_product_code_wrapper(generators, r, compute_logicals, seed, check_co
 
     w = len(generators)
     group = _dfs_generators(generators[0].identity(), generators)
-    h1 = random_check_matrix(r1, w, seed=seed+1 if seed is not None else None)
-    h2 = random_check_matrix(r2, w, seed=seed+2 if seed is not None else None)
+    h1 = random_check_matrix(r1, w if double_cover else w*2, seed=seed+1 if seed is not None else None)
+    h2 = random_check_matrix(r2, w if double_cover else w*2, seed=seed+2 if seed is not None else None)
     return lifted_product_code(group, generators, h1, h2, check_complex = check_complex, compute_logicals = compute_logicals, double_cover=double_cover)
 
 def lifted_product_code_cyclic(q, m, w, r, compute_logicals=None, r2=None, seed=None, check_complex=None, double_cover=None) -> QuantumCode:
     '''Construct a lifted product code with w generators picked at random for Z_q^m. 
+    When using the double cover, the local code block length is twice the number of generators.
     The local systems of the left and right factors contains r constraints.
     If r2 is supplied then one factor in the lifted product will have r constraints and the other will have r2 constraints.
     The seed for each step will be derived from the passed seed if provided.
@@ -378,19 +410,13 @@ def lifted_product_code_cyclic(q, m, w, r, compute_logicals=None, r2=None, seed=
 
     if double_cover is None:
         double_cover = False
-
-    if not double_cover:
-        if q == 2:
-            raise ValueError('Generators cannot be self inverse when not using the double cover')
-        if w % 2 != 0:
-            raise ValueError('Need an even degree for the Cayley graph when not using the double cover')
-        w = w // 2
         
-    generators = random_abelian_generators(q, m, w//2, seed=seed)
+    generators = random_abelian_generators(q, m, w, seed=seed)
     return _lifted_product_code_wrapper(generators, r, compute_logicals=compute_logicals, r2=r2, seed=seed, check_complex=check_complex, double_cover=double_cover)
 
 def lifted_product_code_pgl2(l, i, r, *args, **kwargs):
     '''Construct a lifted product code using the Morgenstern generators for PGL(2, (2^l)^i).
+    When using the double cover, the local code block length is twice the number of generators.
     Seed lifted_product_code_cyclic for other parameters.
     '''
     generators = morgenstern_generators(l, i)
