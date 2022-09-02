@@ -9,14 +9,15 @@ import pandas as pd
 import re 
 from typing import Tuple
 from datetime import datetime
+import math
 
 from _experiment import run_simulation, add_bposd_args, unpack_bposd_args, load_code
 
 def p_sweep(samples, p_values, **kwargs):
     num_procs = cpu_count()
 
-    max_samples = samples//num_procs
-    residual = samples%num_procs if samples%num_procs != 0 else max_samples
+    max_samples = math.ceil(samples/num_procs)
+    residual = samples - max_samples*(num_procs-1)
 
     sample_distribution = [max_samples]*(num_procs-1) + [residual]
     assert np.sum(sample_distribution) == samples
