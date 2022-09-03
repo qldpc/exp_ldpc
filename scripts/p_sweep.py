@@ -17,10 +17,7 @@ def p_sweep(samples, p_values, **kwargs):
     num_procs = cpu_count()
 
     max_samples = math.ceil(samples/num_procs)
-    residual = samples - max_samples*(num_procs-1)
-
-    sample_distribution = [max_samples]*(num_procs-1) + [residual]
-    assert np.sum(sample_distribution) == samples
+    sample_distribution = [max_samples]*(num_procs)
 
     data = []
     with Pool(num_procs) as pool:
