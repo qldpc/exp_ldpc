@@ -165,23 +165,33 @@ def morgenstern_generators(l, i, use_B_generators = None, symmetric = None) -> L
     Since the A generators satisfy a^2 = 1, the inverses of the B generators are (ab)^-1 = ba
     If symmetric is false then we will not include inverses
     '''
+
+    # To get slightly bigger graphs, we can start out with a slightly larger w-regular base multigraph like K_sqrt(w)?
+    # Or, take the product of G with a cyclic group and extend the generators
+
     if symmetric is None:
         symmetric = True
 
     if use_B_generators is None:
         use_B_generators = False
 
-    assert l >= 1
-    # # This restriction is required by the text
-    # assert l % 2 == 0
+    if l != 1:
+        raise ValueError('I was being lazy at some point and hardcoded l=1 when implementing odd i')
+    
     q = 2**l
     Fq = GF(q)
     Fqi = GF(q**i)
 
-    # We need to find some solutions, so we'll just exhaustively search for them
-    # Find i \notin F_q s.t. i^2 + i \in F_q
-    i_element = next(filter(lambda x: (x >= q) and (x**2 + x < q), Fqi.elements))
-    eps = Fq(i_element**2 + i_element)
+    # eps s.t. x^2 + x + eps is irreducible over GF(2^l)
+    # x^2 + x + 1
+    # is irreducible over GF(2)
+    eps = Fq(1)
+
+    print(list(map(lambda x: x**2+x+Fqi(eps), Fqi.elements)))
+
+
+    # i is a root of x^2 + x + 1 in the extension field
+    i_element = next(filter(lambda x: x**2+x+Fqi(eps) == 0, Fqi.elements))
 
     # Find solutions to g^2 + gd + d^2 epsilon = 1
     def poly2(x):

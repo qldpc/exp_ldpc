@@ -1,5 +1,6 @@
 from qldpc.lifted_product_code import random_abelian_generators, morgenstern_generators, _dfs_generators
 from qldpc import lifted_product_code_cyclic, lifted_product_code_pgl2
+import pytest
 
 def test_random_abelian_generators():
     q = 3
@@ -9,9 +10,8 @@ def test_random_abelian_generators():
     group = _dfs_generators(generators[0].identity(), generators)
     assert len(group) == q**m
 
-def test_morgenstern_generators():
-    l = 1
-    i = 2
+@pytest.mark.parametrize('l,i', [(1,2), (1,3), (1,4)])
+def test_morgenstern_generators(l, i):
     generators = morgenstern_generators(l,i)
     identity = generators[0].identity()
     assert len(generators) == 2**l + 1
