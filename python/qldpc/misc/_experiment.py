@@ -17,7 +17,7 @@ class BPOSDCorrectSingleShot():
     _checks : None
     _rounds : int
 
-    def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, bp_osd_options : Dict, priors : Tuple[float, float]):
+    def __init__(self, code : qldpc.QuantumCode, rounds : int, bp_osd_options : Dict, priors : Tuple[float, float]):
         data_prior, measurement_prior = priors
 
         object.__setattr__(self, '_bpd_final_round', bposd_decoder(
@@ -143,8 +143,12 @@ def run_simulation(samples, code, meas_prior, data_prior, noise_model, noise_mod
     data_prior = data_prior(x_steps, z_steps)
 
     
-    sampler = stim.Circuit('\n'.join(storage_sim.circuit)).compile_sampler()
-
+    circuit_string = '\n'.join(list(storage_sim.circuit))
+    print(circuit_string)
+    circuit = stim.Circuit(circuit_string)
+    
+    error_model = circuit.detector_error_model()
+    sampler = circuit.compile_detector_sampler()
     batch = sampler.sample(samples)
     
     # Add correct prior here 1/2 - (1-2p)^n/2
