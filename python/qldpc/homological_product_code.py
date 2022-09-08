@@ -1,18 +1,18 @@
 import scipy.sparse as sparse
 import numpy as np
 from .qecc_util import QuantumCode, QuantumCodeChecks, QuantumCodeLogicals, num_cols, GF2
-from .linalg import gf2_get_pivots
+from .linalg import gf2_get_pivots, gf2_null_space, gf2_column_space, gf2_row_reduce, gf2_matrix_rank
 
 def compute_homology_reps(partial_2 : GF2, partial_1 : GF2, dual=False) -> GF2:
     '''Compute representatives of the homology group of the complex defined by partial_1 . partial_2 = 0'''
 
-    kernel = partial_1.null_space()
-    image = partial_2.column_space() # This is already row reduced
+    kernel = gf2_null_space(partial_1)
+    image = gf2_column_space(partial_2) # This is already row reduced
 
     # We have a basis for the image and we want to extend this to a basis of the kernel
     # Axler 2.B shows how to do this by extending the basis one at a time
 
-    reduced_aug_matrix = np.hstack([image.T, kernel.T]).row_reduce()
+    reduced_aug_matrix = gf2_row_reduce(np.hstack([image.T, kernel.T]))
     # The pivot columns tell us a spanning set for the vector space
     # image.T is already row reduced so the remainder must be the complement in the kernel
     pivot_cols = gf2_get_pivots(reduced_aug_matrix)
@@ -29,7 +29,7 @@ def compute_logical_pairs(z_logicals : GF2, x_logicals : GF2) -> GF2:
     num_pairs = inner_products.shape[1]
         
     z_logicals_aug = GF2(np.hstack([inner_products, z_logicals]))
-    z_logicals_aug = z_logicals_aug.row_reduce(ncols=num_pairs)
+    z_logicals_aug = gf2_row_reduce(z_logicals_aug, ncols=num_pairs)
     z_logicals = z_logicals_aug[:,num_pairs:]
 
     return z_logicals    
@@ -56,7 +56,7 @@ def get_logicals(checks : QuantumCodeChecks , compute_logicals, check_complex) -
             for l in z_logicals:
                 assert np.all((partial_2.T @ l) % 2 == 0)
 
-            assert len(x_logicals) + np.linalg.matrix_rank(partial_1_dense) + np.linalg.matrix_rank(partial_2_dense) == partial_1.shape[1]
+            assert len(x_logicals) + gf2_matrix_rank(partial_1_dense) + gf2_matrix_rank(partial_2_dense) == partial_1.shape[1]
             
     return QuantumCodeLogicals(x_logicals.astype(np.uint32), z_logicals.astype(np.uint32))
 
