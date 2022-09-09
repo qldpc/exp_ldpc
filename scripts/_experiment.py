@@ -1,5 +1,5 @@
 import numpy as np
-from ldpc import bposd_decoder
+from ldpc import bp_decoder, bposd_decoder
 import stim
 import qldpc
 from qldpc import SpacetimeCode, SpacetimeCodeSingleShot
@@ -82,8 +82,51 @@ class BPOSDCorrect():
         correction = self._bpd.decode(syndrome)
         return self._spacetime_code.final_correction(correction)
 
+@dataclass
+class BPOSDHybridCorrect():
+    _bpd_final_round : None
+    _bpd : None
+    _spacetime_code : None
+    _checks : None
+    _rounds : int
+
+    def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, bp_osd_options : Dict, priors : Tuple[float, float]):
+        data_prior, measurement_prior = priors
+
+        object.__setattr__(self, '_bpd_final_round', bposd_decoder(
+            code.checks.z,
+            error_rate = data_prior,
+            **bp_osd_options
+        ))
+
+        object.__setattr__(self, '_rounds', rounds)
+        object.__setattr__(self, '_checks', code.checks.z)
+        object.__setattr__(self, '_spacetime_code', SpacetimeCode(self._checks, rounds))
+
+        channel_prior = np.zeros(self._spacetime_code.spacetime_check_matrix.shape[1])
+        self._spacetime_code.data_bits(channel_prior)[:] = data_prior
+        self._spacetime_code.measurement_bits(channel_prior)[:] = measurement_prior
+    
+        object.__setattr__(self, '_bpd', bp_decoder(
+            self._spacetime_code.spacetime_check_matrix,
+            channel_probs = channel_prior,
+            **bp_osd_options))
+
+
+    def readout_correction(self, history : Callable[[int], np.array], data_readout : np.array) -> np.array:
+        syndrome = self._spacetime_code.syndrome_from_history(history, data_readout)
+        correction = self._bpd.decode(syndrome)
+        final_round_bp_correction = self._spacetime_code.final_correction(correction)
         
-def run_simulation(samples, code, p_ph, bp_osd_options, rounds, single_shot):
+        # Correct the transverse readout
+        data_readout = (final_round_bp_correction + data_readout)%2
+
+        # Final round correction on read out data
+        syndrome = (self._checks @ data_readout)%2
+        final_correction = self._bpd_final_round.decode(syndrome)
+        return (final_correction + final_round_bp_correction)%2
+        
+def run_simulation(samples, code, p_ph, bp_osd_options, rounds, decoder_mode):
     
     checks = code.checks
     logicals = code.logicals
@@ -108,8 +151,14 @@ def run_simulation(samples, code, p_ph, bp_osd_options, rounds, single_shot):
     
     # Add correct prior here 1/2 - (1-2p)^n/2
     # Return measurment/data bits from spacetime code
-    decoder = (BPOSDCorrectSingleShot(code, rounds, bp_osd_options, (data_prior, meas_prior)) if single_shot 
-        else BPOSDCorrect(code, rounds, bp_osd_options, (data_prior, meas_prior)))
+    if decoder_mode == 'bposd':
+        decoder = BPOSDCorrect(code, rounds, bp_osd_options, (data_prior, meas_prior))
+    elif decoder_mode == 'bposd_single_shot':
+        decoder = BPOSDCorrectSingleShot(code, rounds, bp_osd_options, (data_prior, meas_prior))
+    elif decoder_mode == 'bposd_hybrid':
+        decoder = BPOSDHybridCorrect(code, rounds, bp_osd_options, (data_prior, meas_prior))
+    else:
+        raise RuntimeError('Unknown decoder operation mode')
 
     logical_values = []
     for i in range(samples):
@@ -141,8 +190,6 @@ def unpack_bposd_args(parsed_args, code):
 
 def load_code(args):
     '''Load a code and its logicals from the command line arguments'''
-    with args.checks.open() as check_file:
-        checks = qldpc.read_check_generators(check_file, validate_stabilizer_code=True)
-    with args.logicals.open() as logicals_file:
-        logicals = qldpc.read_logicals(logicals_file)
-    return qldpc.QuantumCode(checks, logicals)
+    with args.code.open() as code_file:
+        code = qldpc.read_quantum_code(code_file, validate_stabilizer_code=True)
+    return code

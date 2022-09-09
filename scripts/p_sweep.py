@@ -55,12 +55,11 @@ def parse_sweep_spec(x : str) -> Tuple[float, float, int]:
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Perform a parallelized sweep in the physical error rate for the given quantum code under BP+OSD')
-    parser.add_argument('checks', type=Path)
-    parser.add_argument('logicals', type=Path)
+    parser.add_argument('code', type=Path)
     parser.add_argument('--samples', type=int, help='Number of samples to take')
     parser.add_argument('--p_sweep', type=parse_sweep_spec, help='Specify lower and upper bounds of the sweep + number of points in the form (lower, upper, points)')
     parser.add_argument('--rounds', type=int, help='Number of rounds of syndrome extraction', default=1)
-    parser.add_argument('--single_shot', type=bool, help='Operate decoder in single shot mode', default=False)
+    parser.add_argument('--decoder_mode', choices=['bposd','bposd_single_shot', 'bposd_hybrid'], help='Operate decoder in BP+OSD, BP+OSD (single shot), or hybrid BP + (BP+OSD)', default='bposd')
     parser.add_argument('--linspace', type=bool, help='Perform the sweep with linearly spaced points. The default is uniform spacing in log space', default=False)
     add_bposd_args(parser)
 
@@ -71,6 +70,6 @@ if __name__ == '__main__':
     sweep = np.linspace(*args.p_sweep) if args.linspace else np.geomspace(*args.p_sweep)
 
     result = p_sweep(samples=args.samples, code=code, rounds=args.rounds, 
-        p_values=sweep, single_shot=args.single_shot, bp_osd_options=bp_osd_options)
+        p_values=sweep, decoder_mode=args.decoder_mode, bp_osd_options=bp_osd_options)
     
     result.to_csv(sys.stdout)
