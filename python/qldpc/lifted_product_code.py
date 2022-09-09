@@ -172,8 +172,9 @@ def morgenstern_generators(l, i, use_B_generators = None, symmetric = None) -> L
         use_B_generators = False
 
     assert l >= 1
-    # # This restriction is required by the text
-    # assert l % 2 == 0
+    # This restriction is required by the text
+    if i % 2 != 0:
+        raise ValueError('The Morgenstern construction works only for PGL(2, q^i) with even i, because we need a quaternion algebra')
     q = 2**l
     Fq = GF(q)
     Fqi = GF(q**i)
