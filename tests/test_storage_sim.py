@@ -64,7 +64,7 @@ def test_smoketest_storage_sim():
     rounds = 3
 
     code = random_test_hgp(compute_logicals=False)
-    storage_sim = build_storage_simulation(rounds, noise_model, code.checks, use_x_logicals = False)
+    storage_sim = build_storage_simulation(rounds, noise_model, code, use_x_logicals = False)
     
 
     sampler = stim.Circuit('\n'.join(storage_sim.circuit)).compile_sampler()
