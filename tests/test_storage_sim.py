@@ -32,9 +32,9 @@ def test_noise_rewrite():
 
 def test_ancilla_targets():
     # Reconstruct the checks from the syndrome extraction circuit and verify they match the code
-    checks = random_test_hgp(compute_logicals=False).checks
+    code = random_test_hgp(compute_logicals=False)
     
-    targets, circuit = build_perfect_circuit(checks)
+    targets, circuit = build_perfect_circuit(code)
 
     x_ancilla_idx = frozenset(targets.x_checks)
     measurement_order = deque(map(lambda x: int(x), chain(*[s.split()[1:] for s in circuit if s.startswith(('MX', 'MRX'))])))
@@ -51,12 +51,12 @@ def test_ancilla_targets():
             CZ_targets[int(control)].add(int(target))
 
     # Verify the CX/CZ targets match the check supports
-    assert len(measurement_order) == checks.x.shape[0] + checks.z.shape[0]
+    assert len(measurement_order) == code.checks.x.shape[0] + code.checks.z.shape[0]
     for (i,m) in enumerate(measurement_order):
         if m in x_ancilla_idx:
-            assert CX_targets[m] == set(checks.x[i,:].nonzero()[1])
+            assert CX_targets[m] == set(code.checks.x[i,:].nonzero()[1])
         else:
-            assert CZ_targets[m] == set(checks.z[i-checks.x.shape[0],:].nonzero()[1])
+            assert CZ_targets[m] == set(code.checks.z[i-code.checks.x.shape[0],:].nonzero()[1])
 
 
 def test_smoketest_storage_sim():

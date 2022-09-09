@@ -3,13 +3,13 @@ from typing import Callable, Iterable, Tuple, Dict, List, Deque
 
 from .noise_model import NoiseRewriter
 from .edge_coloring import edge_color_bipartite
-from .qecc_util import num_rows, QuantumCodeChecks, NoiseRewriter, CircuitTargets, StorageSim
+from .qecc_util import num_rows, QuantumCode, QuantumCodeChecks, NoiseRewriter, CircuitTargets, StorageSim
 from collections import deque
 import numpy as np
 
 MeasurementOrder = Tuple[int, Dict[int, int]]
 
-def order_measurements(checks : QuantumCodeChecks) -> Tuple[int, MeasurementOrder, MeasurementOrder]:
+def order_measurements(code : QuantumCode) -> Tuple[int, MeasurementOrder, MeasurementOrder]:
     '''Returns an ordering of measuremnts for X and Z checks. For now we schedule X and Z checks separately'''
     def build_meas_order_basis(checks):
         tanner_graph = bipartite.from_biadjacency_matrix(checks)
@@ -30,14 +30,14 @@ def order_measurements(checks : QuantumCodeChecks) -> Tuple[int, MeasurementOrde
         return (len(data_nodes), len(check_nodes), meas_order)
 
 
-    (x_data_nodes, x_check_nodes, xorder) = build_meas_order_basis(checks.x)
-    (z_data_nodes, z_check_nodes, zorder) = build_meas_order_basis(checks.z)
+    (x_data_nodes, x_check_nodes, xorder) = build_meas_order_basis(code.checks.x)
+    (z_data_nodes, z_check_nodes, zorder) = build_meas_order_basis(code.checks.z)
     assert x_data_nodes == z_data_nodes
     return (x_data_nodes, (x_check_nodes, xorder), (z_check_nodes, zorder) )
 
-def build_perfect_circuit(checks : QuantumCodeChecks) -> Tuple[CircuitTargets, List[str]]:
+def build_perfect_circuit(code : QuantumCode) -> Tuple[CircuitTargets, List[str]]:
     '''Syndrome extraction circuit to measure X checks then Z checks'''
-    (num_data_qubits, (x_check_count, x_check_schedule), (z_check_count, z_check_schedule)) = order_measurements(checks)
+    (num_data_qubits, (x_check_count, x_check_schedule), (z_check_count, z_check_schedule)) = order_measurements(code)
 
     x_check_ancillas = np.array(list(range(num_data_qubits, num_data_qubits+x_check_count)))
     x_check_ancilla_str = ' '.join(str(v) for v in x_check_ancillas)
