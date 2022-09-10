@@ -9,4 +9,4 @@ jobs:
       - uses: nixbuild/nix-quick-install-action@v17
       - name: Build nix derivation and run pytest
         run: | 
-          nix run . -- -m pytest
+          nix --extra-experimental-features "nix-command flakes" run . -- -m pytest
