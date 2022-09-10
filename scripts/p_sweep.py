@@ -6,14 +6,18 @@ from argparse import ArgumentParser
 from pathlib import Path
 import sys
 import pandas as pd
-import re 
+import re
+import qldpc
 from typing import Tuple
 from datetime import datetime
 import math
 
 from _experiment import run_simulation, add_bposd_args, unpack_bposd_args, load_code
 
-def p_sweep(samples, p_values, **kwargs):
+def constant_pheno_prior(p,_,__):
+    return 2/3*p
+
+def p_sweep(samples, p_values, noise_model, noise_model_args, meas_prior, data_prior, **kwargs):
     num_procs = cpu_count()
 
     max_samples = math.ceil(samples/num_procs)
@@ -23,8 +27,8 @@ def p_sweep(samples, p_values, **kwargs):
     with Pool(num_procs) as pool:
         for p_ph in p_values:
             time_start = datetime.now()
-
-            run_shots = partial(run_simulation, p_ph=p_ph, **kwargs)
+            
+            run_shots = partial(run_simulation, noise_model=noise_model, noise_model_args=noise_model_args(p_ph), meas_prior=partial(meas_prior, p_ph), data_prior=partial(data_prior, p_ph), **kwargs)
             logical_values = list(chain(*pool.map(run_shots, sample_distribution)))
             runtime = (datetime.now() - time_start).total_seconds()
 
@@ -53,7 +57,7 @@ def parse_sweep_spec(x : str) -> Tuple[float, float, int]:
         raise RuntimeError('Number of points non-positive or lower bound exceeded upper bound')
     return spec
 
-if __name__ == '__main__':
+def p_sweep_main(noise_model_args, noise_model, meas_prior, data_prior):
     parser = ArgumentParser(description='Perform a parallelized sweep in the physical error rate for the given quantum code under BP+OSD')
     parser.add_argument('code', type=Path)
     parser.add_argument('--samples', type=int, help='Number of samples to take')
@@ -68,8 +72,18 @@ if __name__ == '__main__':
     bp_osd_options = unpack_bposd_args(args, code)
     
     sweep = np.linspace(*args.p_sweep) if args.linspace else np.geomspace(*args.p_sweep)
-
-    result = p_sweep(samples=args.samples, code=code, rounds=args.rounds, 
-        p_values=sweep, decoder_mode=args.decoder_mode, bp_osd_options=bp_osd_options)
+    
+    result = p_sweep(samples=args.samples, code=code, rounds=args.rounds,
+                     noise_model=noise_model, noise_model_args=noise_model_args,
+                     meas_prior=meas_prior, data_prior=data_prior,
+                     p_values=sweep, decoder_mode=args.decoder_mode, bp_osd_options=bp_osd_options)
     
     result.to_csv(sys.stdout)
+
+
+if __name__ == '__main__':
+    noise_model_args = lambda p_ph: {'p':p_ph, 'pm':p_ph}
+    noise_model = qldpc.noise_model.depolarizing_noise
+    pheno_prior = constant_pheno_prior
+    p_sweep_main(noise_model_args, noise_model, pheno_prior, pheno_prior)
+    

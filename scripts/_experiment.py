@@ -126,12 +126,10 @@ class BPOSDHybridCorrect():
         final_correction = self._bpd_final_round.decode(syndrome)
         return (final_correction + final_round_bp_correction)%2
         
-def run_simulation(samples, code, p_ph, bp_osd_options, rounds, decoder_mode):
+def run_simulation(samples, code, meas_prior, data_prior, noise_model, noise_model_args, bp_osd_options, rounds, decoder_mode):
     
     checks = code.checks
     logicals = code.logicals
-
-    noise_model = qldpc.noise_model.depolarizing_noise(p_ph, p_ph)
 
     # X / Z syndrome extraction circuit timesteps
     x_steps = max(np.max(checks.x.sum(axis=0)), np.max(checks.x.sum(axis=1)))
@@ -139,10 +137,10 @@ def run_simulation(samples, code, p_ph, bp_osd_options, rounds, decoder_mode):
     
     # Make this return a class
     # Add X/Z syndrome extraction circuit depth
-    storage_sim = qldpc.build_storage_simulation(rounds, noise_model, checks, use_x_logicals = False)
+    storage_sim = qldpc.build_storage_simulation(rounds, noise_model(**noise_model_args), code, use_x_logicals = False)
 
-    meas_prior = p_ph*(2/3)
-    data_prior = p_ph*(2/3)
+    meas_prior = meas_prior(x_steps, z_steps)
+    data_prior = data_prior(x_steps, z_steps)
 
     
     sampler = stim.Circuit('\n'.join(storage_sim.circuit)).compile_sampler()
