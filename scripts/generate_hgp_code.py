@@ -32,7 +32,7 @@ if __name__ == '__main__':
     code = biregular_hgp(args.nv, args.dv, args.dc, seed=args.seed, compute_logicals=args.compute_logicals,
         girth_bound=args.girth_bound, girth_bound_patience=args.girth_bound_patience)
 
-    storage_sim = build_storage_simulation(args.rounds, noise_model.trivial_noise(), code.checks, use_x_logicals = False)
+    storage_sim = build_storage_simulation(args.rounds, noise_model.trivial_noise(), code, use_x_logicals = False)
 
     if args.save_code is not None:
         with args.save_code.open('w') as code_file:
