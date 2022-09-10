@@ -1,4 +1,4 @@
-name: starter-workflow
+name: pytest
 on: [push]
 jobs:
   build:
