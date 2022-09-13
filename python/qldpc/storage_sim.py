@@ -130,16 +130,31 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, code : Q
     z_check_count = len(targets.z_checks)
 
     circuit = []
-    # Do QEC
+    # ===== Initialize State ====
+    circuit.append(f'R{reset_meas_basis} {" ".join(str(i) for i in targets.data)}')
+    circuit.append('TICK')
+    
+    # ===== Repeated Measurement Rounds ====
     measurements_per_round = x_check_count + z_check_count
-    for t in range(rounds):
+    
+    if rounds > 0:
+        # First round
         circuit.extend(syndrome_extraction_circuit)
-        # Detector annotations
-        if t == 0:
-            circuit.extend(f'DETECTOR({t}, {i}) rec[{i-measurements_per_round}]' for i in range(measurements_per_round))
-        else:
-            circuit.extend(f'DETECTOR({t}, {i}) rec[{i-measurements_per_round}] rec[{i-2*measurements_per_round}]' for i in range(measurements_per_round))
+        # Since we start in a product state, only one measurment type is deterministic
+        circuit.extend(f'DETECTOR(0, {i}) rec[{i-measurements_per_round}]' for i in
+                       (range(0,x_check_count) if use_x_logicals else range(x_check_count, z_check_count)))
         
+        if rounds > 1:
+            # Steady state rounds
+            circuit.append(f'REPEAT {rounds} {{')
+            circuit.extend(syndrome_extraction_circuit)
+            circuit.append('SHIFT_COORDS(1, 0)')
+            # Detector annotations
+            circuit.extend(f'DETECTOR(0, {i}) rec[{i-measurements_per_round}] rec[{i-2*measurements_per_round}]'
+                                      for i in range(measurements_per_round))
+            circuit.append('}')
+
+    # ===== Final Round =====
     # Read out data qubits
     circuit.append(f'M{reset_meas_basis} {" ".join(str(i) for i in targets.data)}')
 
@@ -148,9 +163,9 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, code : Q
         pass
     else:
         records = lambda support: ' '.join(f'rec[{v-len(targets.data)}]' for v in support)
-        circuit.extend(f'DETECTOR({rounds}, {i}) '
-            + f'rec[{i-len(targets.data)-measurements_per_round+x_check_count}] '   # previous round measurement
-            + records(checks.x[i,:].nonzero()[1])                                      # current round syndrome
+        circuit.extend(f'DETECTOR(1, {i}) '
+            + (f'rec[{i-len(targets.data)-measurements_per_round+x_check_count}] ' if rounds > 0 else '')   # previous round measurement
+            + records(checks.z[i,:].nonzero()[1])                                      # current round syndrome
             for i in range(checks.z.shape[0]))
         circuit.extend(f'OBSERVABLE_INCLUDE({i}) '
             + records(np.nonzero(code.logicals.z[i,:])[1])
