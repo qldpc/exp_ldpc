@@ -109,7 +109,9 @@ def _check_unique_targets(circuit : str):
 
 def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, code : QuantumCode, use_x_logicals = None) -> StorageSim:
     '''Construct a simulation where a logical 0 is prepared stored for rounds number of QEC cycles then transversally read out
-    use_x_logicals: prepare a |+> and read out in the X basis'''
+    use_x_logicals: prepare a |+> and read out in the X basis.
+    This is starting to become a pretty leaky abstraction and should probably be replaced with a new design at some point.'''
+    
     if use_x_logicals is None:
         use_x_logicals = False
 
@@ -159,10 +161,16 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, code : Q
     circuit.append(f'M{reset_meas_basis} {" ".join(str(i) for i in targets.data)}')
 
     # Detectors for final round
+    records = lambda support: ' '.join(f'rec[{v-len(targets.data)}]' for v in support)
     if use_x_logicals:
-        pass
+        circuit.extend(f'DETECTOR(1, {i}) '
+            + (f'rec[{i-len(targets.data)-measurements_per_round}] ' if rounds > 0 else '')   # previous round measurement
+            + records(checks.x[i,:].nonzero()[1])                                      # current round syndrome
+            for i in range(checks.x.shape[0]))
+        circuit.extend(f'OBSERVABLE_INCLUDE({i}) '
+            + records(np.nonzero(code.logicals.x[i,:])[1])
+            for i in range(code.logicals.x.shape[0]))
     else:
-        records = lambda support: ' '.join(f'rec[{v-len(targets.data)}]' for v in support)
         circuit.extend(f'DETECTOR(1, {i}) '
             + (f'rec[{i-len(targets.data)-measurements_per_round+x_check_count}] ' if rounds > 0 else '')   # previous round measurement
             + records(checks.z[i,:].nonzero()[1])                                      # current round syndrome

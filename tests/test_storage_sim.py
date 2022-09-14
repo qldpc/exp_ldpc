@@ -8,6 +8,7 @@ from qldpc.code_examples import random_test_hgp
 
 import stim
 import numpy as np
+import pytest
 
 def test_noise_rewrite():
     circuit = [
@@ -58,14 +59,14 @@ def test_ancilla_targets():
         else:
             assert CZ_targets[m] == set(code.checks.z[i-code.checks.x.shape[0],:].nonzero()[1])
 
+storage_sim_test_matrix = [(use_x_logicals, rounds) for use_x_logicals in [True,False] for rounds in [0,3]]
 
-def test_smoketest_storage_sim():
+@pytest.mark.parametrize('use_x_logicals,rounds', storage_sim_test_matrix)
+def test_smoketest_storage_sim(use_x_logicals, rounds):
     noise_model = depolarizing_noise(0.1, 0)
-    rounds = 3
 
     code = random_test_hgp(compute_logicals=False)
-    storage_sim = build_storage_simulation(rounds, noise_model, code, use_x_logicals = False)
-    
+    storage_sim = build_storage_simulation(rounds, noise_model, code, use_x_logicals = use_x_logicals)
 
     sampler = stim.Circuit('\n'.join(storage_sim.circuit)).compile_sampler()
     sample = np.where(sampler.sample(1)[0], 1, 0)
@@ -88,3 +89,19 @@ def test_smoketest_storage_sim():
     assert storage_sim.measurement_view(0, True, sample).shape[0] == code.checks.x.shape[0]
     assert storage_sim.measurement_view(0, False, sample).shape[0] == code.checks.z.shape[0]
     assert storage_sim.data_view(sample).shape[0] == code.num_qubits
+
+@pytest.mark.parametrize('use_x_logicals,rounds', storage_sim_test_matrix)
+def test_smoketest_storage_sim_detectors(use_x_logicals, rounds):
+    noise_model = depolarizing_noise(0.1, 0)
+    rounds = 3
+
+    code = random_test_hgp(compute_logicals=False)
+
+    storage_sim = build_storage_simulation(rounds, noise_model, code, use_x_logicals = use_x_logicals)
+
+    circuit = stim.Circuit('\n'.join(storage_sim.circuit))
+    sampler = circuit.compile_detector_sampler()
+    sample = np.where(sampler.sample(1)[0], 1, 0)
+
+    # Is this at least the right size?
+    assert sample.shape[0] == (code.checks.x.shape[0] + code.checks.z.shape[0])*rounds + code.num_qubits
