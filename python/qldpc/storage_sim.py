@@ -144,11 +144,11 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, code : Q
         circuit.extend(syndrome_extraction_circuit)
         # Since we start in a product state, only one measurment type is deterministic
         circuit.extend(f'DETECTOR(0, {i}) rec[{i-measurements_per_round}]' for i in
-                       (range(0,x_check_count) if use_x_logicals else range(x_check_count, z_check_count)))
+                       (range(0,x_check_count) if use_x_logicals else range(x_check_count, measurements_per_round)))
         
         if rounds > 1:
             # Steady state rounds
-            circuit.append(f'REPEAT {rounds} {{')
+            circuit.append(f'REPEAT {rounds-1} {{')
             circuit.extend(syndrome_extraction_circuit)
             circuit.append('SHIFT_COORDS(1, 0)')
             # Detector annotations
@@ -168,7 +168,7 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, code : Q
             + records(checks.x[i,:].nonzero()[1])                                      # current round syndrome
             for i in range(checks.x.shape[0]))
         circuit.extend(f'OBSERVABLE_INCLUDE({i}) '
-            + records(np.nonzero(code.logicals.x[i,:])[1])
+            + records(np.nonzero(code.logicals.x[i,:])[0])
             for i in range(code.logicals.x.shape[0]))
     else:
         circuit.extend(f'DETECTOR(1, {i}) '
@@ -176,7 +176,7 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, code : Q
             + records(checks.z[i,:].nonzero()[1])                                      # current round syndrome
             for i in range(checks.z.shape[0]))
         circuit.extend(f'OBSERVABLE_INCLUDE({i}) '
-            + records(np.nonzero(code.logicals.z[i,:])[1])
+            + records(np.nonzero(code.logicals.z[i,:])[0])
             for i in range(code.logicals.z.shape[0]))
 
 

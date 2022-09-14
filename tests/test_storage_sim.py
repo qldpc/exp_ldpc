@@ -95,13 +95,15 @@ def test_smoketest_storage_sim_detectors(use_x_logicals, rounds):
     noise_model = depolarizing_noise(0.1, 0)
     rounds = 3
 
-    code = random_test_hgp(compute_logicals=False)
+    code = random_test_hgp(compute_logicals=True)
 
     storage_sim = build_storage_simulation(rounds, noise_model, code, use_x_logicals = use_x_logicals)
 
     circuit = stim.Circuit('\n'.join(storage_sim.circuit))
     sampler = circuit.compile_detector_sampler()
-    sample = np.where(sampler.sample(1)[0], 1, 0)
+    sample = np.where(sampler.sample(1, append_observables=True)[0], 1, 0)
 
     # Is this at least the right size?
-    assert sample.shape[0] == (code.checks.x.shape[0] + code.checks.z.shape[0])*rounds + code.num_qubits
+    num_x_checks = code.checks.x.shape[0]
+    num_z_checks = code.checks.z.shape[0]
+    assert sample.shape[0] == 2*(num_x_checks if use_x_logicals else num_z_checks) + (num_x_checks + num_z_checks)*max(rounds-1,0) + code.num_logicals
