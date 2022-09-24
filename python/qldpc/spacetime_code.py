@@ -2,7 +2,8 @@ from typing import Callable, Iterable, Tuple, Dict, List, Deque
 from dataclasses import dataclass
 import scipy.sparse as sparse
 import numpy as np
-from itertools import repeat
+import stim
+from itertools import repeat, chain
 from functools import partial
 from numpy.typing import ArrayLike
 
@@ -116,4 +117,69 @@ def _spacetime_syndrome(rounds : int, check_matrix : sparse.spmatrix, syndrome_h
     syndrome = syndrome_matrix.reshape((rounds+1)*r, order='C')
     
     return syndrome
+
+
+@dataclass(frozen=True)
+class DetectorSpacetimeCode:
+    '''Variant of spacetime code that starts from a Stim detector model and produces an effective "Fault check matrix", fault priors, and fault mapping matrix'''
+
+    fault_check_matrix : sparse.spmatrix
+    fault_map : np.array
+    fault_priors : np.array
+
+    def __init__(self, detector_model : stim.DetectorErrorModel):
+        detector_model = detector_model.flattened()
+        
+        detector_offset = 0
+        fault_check_matrix_cols = []
+        fault_map_cols = []
+        fault_priors = []
+
+        max_logical_idx = -1
+        max_detector_idx = -1
+        for instruction in detector_model:
+            # Requires a flattened model for now
+            assert any(instruction.type == t for t in ['error', 'detector', 'logical_observable'])
+
+            # These may be empty
+            try:
+                max_detector_idx = max(max_detector_idx, max(x.val+detector_offset for x in instruction.targets_copy() if x.is_relative_detector_id()))
+            except ValueError:
+                pass
+
+            try:
+                max_logical_idx = max(max_logical_idx, max(x.val for x in instruction.targets_copy() if x.is_logical_observable_id()))
+            except ValueError:
+                pass
+
+            if instruction.type == 'error':
+                error = instruction
+                detectors = [x.val + detector_offset for x in error.targets_copy() if x.is_relative_detector_id()]
+                logicals = [x.val for x in error.targets_copy() if x.is_logical_observable_id()]
+                assert len(error.args_copy()) == 1
+
+                fault_check_matrix_cols.append(detectors)
+                fault_map_cols.append(logicals)
+                fault_priors.append(error.args_copy()[0])
+
+        num_detectors = 1+max_detector_idx
+        num_logicals = 1+max_logical_idx
+
+        def lil_to_coo(a):
+            for j, col in enumerate(a):
+                for i, entry in enumerate(col):
+                    yield [i,j,1]
+                    
+        def mk_sparse(a, shape):
+            IJV_entries = list(lil_to_coo(a))
+            IJV = np.array(IJV_entries, dtype=np.uint32)
+            return sparse.coo_matrix((IJV[:,2], (IJV[:,0], IJV[:,1])), shape=shape, dtype=np.uint32).tocsr()
+
+        fault_check_matrix = mk_sparse(fault_check_matrix_cols, shape=(num_detectors, len(fault_check_matrix_cols)))
+        fault_map = mk_sparse(fault_map_cols, shape=(num_logicals, len(fault_map_cols)))
+        fault_priors = np.array(fault_priors)
+        object.__setattr__(self, 'fault_check_matrix', fault_check_matrix)
+        object.__setattr__(self, 'fault_map', fault_map)
+        object.__setattr__(self, 'fault_priors', fault_priors)
+    
     

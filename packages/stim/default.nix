@@ -57,11 +57,11 @@ buildPythonPackage rec {
 
   disabledTestPaths = [
     # No pymatching
-    "glue/sample/src/sinter/main_test.py"
-    "glue/sample/src/sinter/decoding_test.py"
-    "glue/sample/src/sinter/predict_test.py"
-    "glue/sample/src/sinter/collection_test.py"
-    "glue/sample/src/sinter/collection_work_manager.py"
-    "glue/sample/src/sinter/worker_test.py"
+    "glue/sample/src/sinter/_main_test.py"
+    "glue/sample/src/sinter/_decoding_test.py"
+    "glue/sample/src/sinter/_predict_test.py"
+    "glue/sample/src/sinter/_collection_test.py"
+    "glue/sample/src/sinter/_collection_work_manager.py"
+    "glue/sample/src/sinter/_worker_test.py"
   ];
 }
