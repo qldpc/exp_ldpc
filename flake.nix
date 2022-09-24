@@ -10,7 +10,7 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           pythonPackageOverlay = import ./packages; 
-          python = pkgs.python39.override {
+          python = pkgs.python310.override {
             packageOverrides = pythonPackageOverlay;
           };
         in rec {
@@ -26,6 +26,7 @@
             ps.stim
             ps.ldpc
 
+            ps.pytest
             ps.numpy
             ps.pandas
             ps.scipy
