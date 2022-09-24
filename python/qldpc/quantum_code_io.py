@@ -46,7 +46,7 @@ def read_quantum_code(stream : IOBase, validate_stabilizer_code = None) -> Quant
     x_checks = make_check_matrix(rows['X'], qubit_count)
     z_checks = make_check_matrix(rows['Z'], qubit_count)
     checks = QuantumCodeChecks(x_checks, z_checks)
-    logicals = QuantumCodeLogicals(make_check_matrix(rows['LX'], qubit_count).todense(), make_check_matrix(rows['LZ'], qubit_count).todense())
+    logicals = QuantumCodeLogicals(make_check_matrix(rows['LX'], qubit_count).toarray(), make_check_matrix(rows['LZ'], qubit_count).toarray())
 
     if validate_stabilizer_code is True:
         if not np.all((checks.x @ checks.z.transpose()).data%2 == 0):
