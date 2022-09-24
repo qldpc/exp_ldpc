@@ -176,7 +176,7 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, code : Q
             + records(checks.z[i,:].nonzero()[1])                                      # current round syndrome
             for i in range(checks.z.shape[0]))
         circuit.extend(f'OBSERVABLE_INCLUDE({i}) '
-            + records(np.nonzero(code.logicals.z[i,:])[1])
+            + records(np.nonzero(code.logicals.z[i,:])[0])
             for i in range(code.logicals.z.shape[0]))
 
     # Rewrite circuit with noise model
