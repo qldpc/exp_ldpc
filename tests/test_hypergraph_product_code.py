@@ -18,7 +18,7 @@ def test_smoketest_biregular_hgp():
     assert get_rank(logicals.x) == logicals.x.shape[0]
     assert get_rank(logicals.z) == logicals.z.shape[0]
     # X and Z logicals come in pairs
-    assert np.all(logicals.z @ logicals.x.transpose() == np.identity(logicals.z.shape[0]))
+    assert np.all((logicals.z @ logicals.x.transpose())%2 == np.identity(logicals.z.shape[0]))
 
     # In general the checks may not be independent ex. toric code
     x_checks_dense = checks.x.todense()

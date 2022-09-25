@@ -57,8 +57,7 @@ def get_logicals(checks : QuantumCodeChecks , compute_logicals, check_complex) -
                 assert np.all((partial_2.T @ l) % 2 == 0)
 
             assert len(x_logicals) + np.linalg.matrix_rank(partial_1_dense) + np.linalg.matrix_rank(partial_2_dense) == partial_1.shape[1]
-            
-    return QuantumCodeLogicals(x_logicals.astype(np.uint32), z_logicals.astype(np.uint32))
+    return QuantumCodeLogicals(np.array(x_logicals, dtype=np.uint32), np.array(z_logicals, dtype=np.uint32))
 
     
 

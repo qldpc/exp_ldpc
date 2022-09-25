@@ -1,4 +1,5 @@
 from typing import Iterable, Tuple, List, Callable
+import warnings
 from scipy import sparse
 import numpy as np
 from numpy.typing import ArrayLike
@@ -62,12 +63,15 @@ class QuantumCodeLogicals:
         # Check for integral datatypes (warn if signed)
         _check_integral(self.x)
         _check_integral(self.z)
-
+        
         # Size checks
         if self.x.shape[1] != self.z.shape[1]:
             raise ValueError("x and z logicals act on an inconsistent number of qubits")
         if self.x.shape[0] != self.z.shape[0]:
             raise ValueError("Number of provided X and Z logical operators mismatch")
+
+        if type(self.x) is not np.ndarray or type(self.z) is not np.ndarray:
+            warnings.warn(f'Attempting to create QuantumCodeLogicals with something that is not a numpy array. Got: {type(self.x)=} and {type(self.z)=}')
 
     @property
     def num_qubits(self) -> int:

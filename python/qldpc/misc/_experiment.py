@@ -2,7 +2,7 @@ import numpy as np
 from ldpc import bp_decoder, bposd_decoder
 import stim
 import qldpc
-from qldpc import SpacetimeCode, SpacetimeCodeSingleShot
+from qldpc import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpacetimeCode
 from galois import GF2
 from functools import partial
 from dataclasses import dataclass
@@ -17,7 +17,7 @@ class BPOSDCorrectSingleShot():
     _checks : None
     _rounds : int
 
-    def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, bp_osd_options : Dict, priors : Tuple[float, float]):
+    def __init__(self, code : qldpc.QuantumCode, rounds : int, bp_osd_options : Dict, priors : Tuple[float, float]):
         data_prior, measurement_prior = priors
 
         object.__setattr__(self, '_bpd_final_round', bposd_decoder(
@@ -112,7 +112,6 @@ class BPOSDHybridCorrect():
             channel_probs = channel_prior,
             **bp_osd_options))
 
-
     def readout_correction(self, history : Callable[[int], np.array], data_readout : np.array) -> np.array:
         syndrome = self._spacetime_code.syndrome_from_history(history, data_readout)
         correction = self._bpd.decode(syndrome)
@@ -125,7 +124,33 @@ class BPOSDHybridCorrect():
         syndrome = (self._checks @ data_readout)%2
         final_correction = self._bpd_final_round.decode(syndrome)
         return (final_correction + final_round_bp_correction)%2
+
+@dataclass
+class BPDetectorCorrect():
+    _bpd : None
+    _detector_spacetime_code : None
+
+    def __init__(self, detector_error_model : stim.DetectorErrorModel, bp_osd_options : Dict):
+        detector_spacetime_code = DetectorSpacetimeCode(detector_error_model)
+        object.__setattr__(self, '_detector_spacetime_code', detector_spacetime_code)
         
+        bpd = bp_decoder(
+            self._detector_spacetime_code.fault_check_matrix,
+            channel_probs = self._detector_spacetime_code.fault_priors,
+            **bp_osd_options)
+        object.__setattr__(self, '_bpd', bpd)
+
+    def readout_correction(self, detector_string : np.array) -> np.array:
+        '''Return the corrected logical observable measurements'''
+
+        num_detectors = self._detector_spacetime_code.fault_check_matrix.shape[0]
+        syndrome = detector_string[:num_detectors]
+        logicals = detector_string[num_detectors:]
+        fault_set = self._bpd.decode(syndrome)
+        logicals = (logicals + self._detector_spacetime_code.fault_map @ fault_set)%2
+        return logicals
+        
+
 def run_simulation(samples, code, meas_prior, data_prior, noise_model, noise_model_args, bp_osd_options, rounds, decoder_mode):
     
     checks = code.checks
@@ -143,10 +168,12 @@ def run_simulation(samples, code, meas_prior, data_prior, noise_model, noise_mod
     data_prior = data_prior(x_steps, z_steps)
 
     
-    sampler = stim.Circuit('\n'.join(storage_sim.circuit)).compile_sampler()
+    circuit_string = '\n'.join(list(storage_sim.circuit))
+    circuit = stim.Circuit(circuit_string)
 
-    batch = sampler.sample(samples)
-    
+    error_model = circuit.detector_error_model()
+
+    detectors = False
     # Add correct prior here 1/2 - (1-2p)^n/2
     # Return measurment/data bits from spacetime code
     if decoder_mode == 'bposd':
@@ -155,16 +182,31 @@ def run_simulation(samples, code, meas_prior, data_prior, noise_model, noise_mod
         decoder = BPOSDCorrectSingleShot(code, rounds, bp_osd_options, (data_prior, meas_prior))
     elif decoder_mode == 'bposd_hybrid':
         decoder = BPOSDHybridCorrect(code, rounds, bp_osd_options, (data_prior, meas_prior))
+    elif decoder_mode == 'bpd_detector':
+        decoder = BPDetectorCorrect(error_model, bp_osd_options)
+        detectors = True
     else:
         raise RuntimeError('Unknown decoder operation mode')
+
+
+    if detectors:
+        sampler = circuit.compile_detector_sampler()
+        batch = sampler.sample(samples, append_observables=True)
+    else:
+        sampler = circuit.compile_sampler()
+        batch = sampler.sample(samples)
 
     logical_values = []
     for i in range(samples):
         batch01 = np.where(batch[i], 1, 0)
-        data_readout = storage_sim.data_view(batch01)
-        history = partial(storage_sim.measurement_view, get_x_checks=False, measurement_vector=batch01)
-        data_readout = (data_readout + decoder.readout_correction(history, data_readout))%2
-        logical_values.append(np.any(GF2(logicals.z) @ GF2(data_readout) != 0))
+        if detectors:
+            corrected_logicals = decoder.readout_correction(batch01)
+            logical_values.append(np.any(corrected_logicals != 0))
+        else:
+            data_readout = storage_sim.data_view(batch01)
+            history = partial(storage_sim.measurement_view, get_x_checks=False, measurement_vector=batch01)
+            data_readout = (data_readout + decoder.readout_correction(history, data_readout))%2
+            logical_values.append(np.any(GF2(logicals.z) @ GF2(data_readout) != 0))
     return logical_values
 
 
