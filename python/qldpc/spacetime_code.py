@@ -39,11 +39,12 @@ class SpacetimeCodeSingleShot:
 @dataclass(frozen=True)
 class SpacetimeCode:
     spacetime_check_matrix : sparse.spmatrix
+    inactivation_sets : sparse.spmatrix
     _check_matrix : sparse.spmatrix
     _num_rounds : int
     _datablock_size : int
 
-    def __init__(self, check_matrix : sparse.spmatrix, num_rounds : int):
+    def __init__(self, check_matrix : sparse.spmatrix, num_rounds : int, dual_basis_checks : sparse.spmatrix = None):
         '''Construct a check matrix that is the corresponding space-time code that localizes errors to single points in a syndrome history.
         (tracking syndrome differences)'''
 
@@ -73,6 +74,15 @@ class SpacetimeCode:
         object.__setattr__(self, 'spacetime_check_matrix', spacetime_check_matrix)
         object.__setattr__(self, '_num_rounds', num_rounds)
         object.__setattr__(self, '_datablock_size', measurement_block.shape[1])
+        object.__setattr__(self, 'inactivation_sets', None)
+
+        if dual_basis_checks is not None:
+            # Construct inactivation_sets by stacking Z checks in time
+            inactivation_sets = sparse.hstack([
+                sparse.block_diag(repeat(dual_basis_checks.tocoo(), num_rounds+1)),
+                sparse.coo_matrix(([], ([], [])), shape=(num_rounds*r, num_rounds*r*2))])
+            assert inactivation_sets.shape[1] == self.spacetime_check_matrix.shape[1]
+            object.__setattr__(self, 'inactivation_sets', inactivation_sets)
 
     def syndrome_from_history(self, history : Callable[[int], ArrayLike], readout : ArrayLike) -> ArrayLike:
         '''Convert a history of measurements to a spacetime syndrome'''

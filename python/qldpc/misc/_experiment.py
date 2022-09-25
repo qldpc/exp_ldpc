@@ -83,12 +83,46 @@ class BPOSDCorrect():
         return self._spacetime_code.final_correction(correction)
 
 @dataclass
+class SIBPDCorrection():
+    _spacetime_code : SpacetimeCode
+    _bpd : None
+    _priors : np.array
+    _si_cutoff : int
+
+    def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, priors : Tuple[float, float], si_cutoff : int):
+        data_prior, measurement_prior = priors
+
+        object.__setattr__(self, '_si_cutoff', si_cutoff)
+        object.__setattr__(self, '_spacetime_code', SpacetimeCode(self._checks, rounds))
+
+        
+
+        channel_prior = np.zeros(self._spacetime_code.spacetime_check_matrix.shape[1])
+        self._spacetime_code.data_bits(channel_prior)[:] = data_prior
+        self._spacetime_code.measurement_bits(channel_prior)[:] = measurement_prior
+        object.__setattr__(self, '_priors', channel_prior)
+
+        
+        object.__setattr__(self, '_bpd', bp_decoder(
+            self._spacetime_code.spacetime_check_matrix,
+            channel_probs = self._priors,
+            **bp_osd_options))
+
+
+    def readout_correction(self, history : Callable[[int], np.array], readout : np.array) -> np.array:
+        syndrome = self._spacetime_code.syndrome_from_history(history, readout)
+        correction = self._bpd.decode(syndrome)
+        return self._spacetime_code.final_correction(correction)
+
+    
+    
+@dataclass
 class BPOSDHybridCorrect():
     _bpd_final_round : None
     _bpd : None
     _spacetime_code : None
     _checks : None
-    _rounds : int
+    _rounds : int 
 
     def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, bp_osd_options : Dict, priors : Tuple[float, float]):
         data_prior, measurement_prior = priors
