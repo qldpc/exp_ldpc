@@ -6,7 +6,7 @@ from qldpc import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpacetimeCode
 from galois import GF2
 from functools import partial
 from dataclasses import dataclass
-from typing import Callable, Dict, Tuple
+from typing import Callable, Dict, Tuple, Optional
 
 
 @dataclass(frozen=True)
@@ -87,12 +87,12 @@ class SIBPDCorrection():
     _spacetime_code : SpacetimeCode
     _bpd : None
     _priors : np.array
-    _si_cutoff : int
+    _si_max_iter : int
 
-    def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, priors : Tuple[float, float], si_cutoff : int):
+    def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, bp_osd_options : Dict, priors : Tuple[float, float], si_cutoff : int):
         data_prior, measurement_prior = priors
 
-        object.__setattr__(self, '_si_cutoff', si_cutoff)
+        object.__setattr__(self, '_si_max_iter', si_cutoff)
         object.__setattr__(self, '_spacetime_code', SpacetimeCode(self._checks, rounds))
 
         
@@ -108,10 +108,49 @@ class SIBPDCorrection():
             channel_probs = self._priors,
             **bp_osd_options))
 
+    def _compute_reliability(self, posterior_llr : np.array) -> np.array:
+        reliability = np.zeros(self._spacetime_code.inactivation_sets.shape[0])
+        row_nonzero, col_nonzero = self._spacetime_code.inactivation_sets.nonzero()
+        for i in range(row_nonzero.shape[0]):
+            reliability[row_nonzero[i]] += np.abs(posterior_llr[col_nonzero[i]])
+        return reliability        
+
+    def _check_feasible(self, syndrome, deactivated_set) -> Optional[np.array]:
+        '''Returns a correction supported on deactivated_set explaining syndrome if a solution exists'''
+        # We need to get a submatrix of the check matrix with columns deactivated_set and rows for which there is a nonzero entry in deactivate set
+        assert False
 
     def readout_correction(self, history : Callable[[int], np.array], readout : np.array) -> np.array:
         syndrome = self._spacetime_code.syndrome_from_history(history, readout)
-        correction = self._bpd.decode(syndrome)
+
+        self._bpd.update_channel_probs(self._priors)
+        deactivated_set = set()
+
+        stabilizer_ranking = None
+        for si_iter in self._si_max_iter:
+            # Run BP
+            correction = self._bpd.decode(syndrome)
+            posterior_llr =  self._bpd.log_prob_ratios()
+
+            # Check (exit condition) that the deactivated set supports a correction 
+            if self._bpd.converge() == 1:
+                residual_syndrome = (syndrome + self._spacetime_code.spacetime_check_matrix @ correction)%2
+                total_correction = self._check_feasible(correction, residual_syndrome, deactivated_set)
+                if total_correction is not None:
+                    correction = total_correction
+                    break
+
+            # Compute reliability if it has not yet been computed
+            if stabilizer_ranking is None:
+                reliability = self._compute_reliability(posterior_llr)
+                stabilizer_ranking = np.argsort(reliability)
+            
+            # Deactivate stabilizer at ranking si_iter
+            deactivated_set.add(self._spacetime_code.inactivation_sets[stabilizer_ranking[si_iter]].nonzero()[1])
+            posterior_llr[deactivated_set] = 0
+
+            self._bpd.update_channel_probs(posterior_llr)
+
         return self._spacetime_code.final_correction(correction)
 
     
