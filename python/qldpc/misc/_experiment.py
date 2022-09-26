@@ -5,8 +5,9 @@ import qldpc
 from qldpc import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpacetimeCode
 from galois import GF2
 from functools import partial
+from itertools import chain
 from dataclasses import dataclass
-from typing import Callable, Dict, Tuple, Optional
+from typing import Callable, Dict, Tuple, Optional, Set
 
 
 @dataclass(frozen=True)
@@ -89,11 +90,11 @@ class SIBPDCorrection():
     _priors : np.array
     _si_max_iter : int
 
-    def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, bp_osd_options : Dict, priors : Tuple[float, float], si_cutoff : int):
+    def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, bp_options : Dict, priors : Tuple[float, float]):
         data_prior, measurement_prior = priors
 
-        object.__setattr__(self, '_si_max_iter', si_cutoff)
-        object.__setattr__(self, '_spacetime_code', SpacetimeCode(self._checks, rounds))
+        object.__setattr__(self, '_si_max_iter', bp_options['si_cutoff'])
+        object.__setattr__(self, '_spacetime_code', SpacetimeCode(code.checks.z, rounds, dual_basis_checks = code.checks.x))
 
         
 
@@ -106,55 +107,86 @@ class SIBPDCorrection():
         object.__setattr__(self, '_bpd', bp_decoder(
             self._spacetime_code.spacetime_check_matrix,
             channel_probs = self._priors,
-            **bp_osd_options))
+            bp_method = 'psl', max_iter = bp_options['max_iter']),
+        )
 
     def _compute_reliability(self, posterior_llr : np.array) -> np.array:
+        '''Compute reliability of stabilizer generators'''
+        # This routine might need to be JIT'd
         reliability = np.zeros(self._spacetime_code.inactivation_sets.shape[0])
         row_nonzero, col_nonzero = self._spacetime_code.inactivation_sets.nonzero()
         for i in range(row_nonzero.shape[0]):
             reliability[row_nonzero[i]] += np.abs(posterior_llr[col_nonzero[i]])
         return reliability        
 
+    @staticmethod
+    def _set_to_indices(a : Set):
+        '''Convert a set to a sorted numpy list'''
+        return np.sort(np.fromiter(a, int, len(a)))
+    
     def _check_feasible(self, syndrome, deactivated_set) -> Optional[np.array]:
         '''Returns a correction supported on deactivated_set explaining syndrome if a solution exists'''
+
+        if len(deactivated_set) == 0:
+            return (None if np.count_nonzero(syndrome) > 0
+                    else np.zeros(self._spacetime_code.inactivation_sets.shape[1], dtype=np.uint32))
+        
         # We need to get a submatrix of the check matrix with columns deactivated_set and rows for which there is a nonzero entry in deactivate set
-        assert False
+        inactivation_set_csc = self._spacetime_code.inactivation_sets.tocsc()
+        submatrix_rows = self._set_to_indices(set(chain(inactivation_set_csc.getcol(j).nonzero() for j in deactivated_set)))
+        deactivated_set_idx = self._set_to_indices(deactivated_set)
+        
+        # Solve syndrome equation for the submatrix induced by the deactivated set
+        check_submatrix = inactivation_set_csc[submatrix_rows, deactivated_set_idx].toarray()
+
+        syndrome_submatrix = syndrome[submatrix_rows]
+        augmented = GF2(np.hstack([check_submatrix, syndrome_submatrix[:,np.newaxis]]))
+        augmented.row_reduce(ncols = min(augmented.shape[1]-1, augmented.shape[0]))
+        solution_vec = augmented[:, augmented.shape[1]-1]
+
+        if check_submatrix @ solution_vec == syndrome_submatrix:
+            correction = np.zeros(self._spacetime_code.inactivation_sets.shape[1], dtype=np.uint32)
+            correction[submatrix_rows] = np.array(solution_vec)
+            return correction
+        else:
+            return None
 
     def readout_correction(self, history : Callable[[int], np.array], readout : np.array) -> np.array:
         syndrome = self._spacetime_code.syndrome_from_history(history, readout)
 
-        self._bpd.update_channel_probs(self._priors)
         deactivated_set = set()
 
         stabilizer_ranking = None
-        for si_iter in self._si_max_iter:
+        for si_iter in range(self._si_max_iter):
+            # Set prior with deactivated set
+            bp_prior = self._priors
+            bp_prior[self._set_to_indices(deactivated_set)] = 0.5
+            self._bpd.update_channel_probs(bp_prior)
+            
             # Run BP
             correction = self._bpd.decode(syndrome)
-            posterior_llr =  self._bpd.log_prob_ratios()
 
             # Check (exit condition) that the deactivated set supports a correction 
-            if self._bpd.converge() == 1:
+            if self._bpd.converge == 1:
                 residual_syndrome = (syndrome + self._spacetime_code.spacetime_check_matrix @ correction)%2
-                total_correction = self._check_feasible(correction, residual_syndrome, deactivated_set)
+                total_correction = self._check_feasible(residual_syndrome, deactivated_set)
                 if total_correction is not None:
                     correction = total_correction
                     break
 
             # Compute reliability if it has not yet been computed
             if stabilizer_ranking is None:
-                reliability = self._compute_reliability(posterior_llr)
+                reliability = self._compute_reliability(self._bpd.log_prob_ratios)
                 stabilizer_ranking = np.argsort(reliability)
             
             # Deactivate stabilizer at ranking si_iter
-            deactivated_set.add(self._spacetime_code.inactivation_sets[stabilizer_ranking[si_iter]].nonzero()[1])
-            posterior_llr[deactivated_set] = 0
+            deactivated_set.update(frozenset(self._spacetime_code.inactivation_sets[stabilizer_ranking[si_iter]].nonzero()[1]))            
 
-            self._bpd.update_channel_probs(posterior_llr)
+
 
         return self._spacetime_code.final_correction(correction)
 
-    
-    
+
 @dataclass
 class BPOSDHybridCorrect():
     _bpd_final_round : None
@@ -255,6 +287,8 @@ def run_simulation(samples, code, meas_prior, data_prior, noise_model, noise_mod
         decoder = BPOSDCorrectSingleShot(code, rounds, bp_osd_options, (data_prior, meas_prior))
     elif decoder_mode == 'bposd_hybrid':
         decoder = BPOSDHybridCorrect(code, rounds, bp_osd_options, (data_prior, meas_prior))
+    elif decoder_mode == 'sibpd':
+        decoder = SIBPDCorrection(code, rounds, bp_osd_options, (data_prior, meas_prior))
     elif decoder_mode == 'bpd_detector':
         decoder = BPDetectorCorrect(error_model, bp_osd_options)
         detectors = True
@@ -285,20 +319,22 @@ def run_simulation(samples, code, meas_prior, data_prior, noise_model, noise_mod
 
 def add_bposd_args(parser):
     '''Add arguments associated with BP+OSD to an ArgumentParser'''
-    parser.add_argument('--bposd_max_iter', type=lambda x: int(x) if x is not None else None, help='Maximum number of iterations for BP. Default is the number of qubits in the code', default=None)
-    parser.add_argument('--bposd_bp_method', choices=['ps', 'ms', 'msl'], help='BP method (product-sum, min-sum, min-sum log)', default='ps')
+    parser.add_argument('--bp_max_iter', type=lambda x: int(x) if x is not None else None, help='Maximum number of iterations for BP. Default is the number of qubits in the code', default=None)
+    parser.add_argument('--bposd_bp_method', choices=['ps', 'ms', 'msl', 'psl'], help='BP method (product-sum, min-sum, min-sum log, product-sum log)', default='ps')
     parser.add_argument('--bposd_ms_scaling_factor', type=float, help='Min sum scaling factor. Use variable scaling factor method if 0', default=0)
     parser.add_argument('--bposd_osd_method', choices=['osd_e', 'osd_cs', 'osd0'], help='OSD method', default='osd_cs')
+    parser.add_argument('--si_cutoff', type=int, help='Maximum number of stabilizer inactivation iterations', default = 10)
     parser.add_argument('--bposd_osd_order', type=int, help='OSD search depth', default=7)
 
 def unpack_bposd_args(parsed_args, code):
     '''Convert the BP+OSD command line arguments to the arguments passed to the BP+OSD decoder'''
     return {
-        'max_iter':parsed_args.bposd_max_iter if parsed_args.bposd_max_iter is not None else code.checks.num_qubits,
+        'max_iter':parsed_args.bp_max_iter if parsed_args.bp_max_iter is not None else code.checks.num_qubits,
         'bp_method':parsed_args.bposd_bp_method,
         'ms_scaling_factor':parsed_args.bposd_ms_scaling_factor,
         'osd_method':parsed_args.bposd_osd_method, #the OSD method. Choose from:  1) "osd_e", "osd_cs", "osd0"
-        'osd_order':parsed_args.bposd_osd_order
+        'osd_order':parsed_args.bposd_osd_order,
+        'si_cutoff':parsed_args.si_cutoff,
     }
 
 def load_code(args):

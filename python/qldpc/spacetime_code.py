@@ -68,7 +68,7 @@ class SpacetimeCode:
 
         measurement_block = sparse.coo_matrix((np.ones_like(measurement_block_i), (measurement_block_i, measurement_block_j)),
             shape=((num_rounds+1)*r, num_rounds*r), dtype=np.uint32)
-        spacetime_check_matrix = sparse.hstack([spacetime_check_matrix, measurement_block])
+        spacetime_check_matrix = sparse.hstack([spacetime_check_matrix, measurement_block]).tocsr()
 
         object.__setattr__(self, '_check_matrix', check_matrix)
         object.__setattr__(self, 'spacetime_check_matrix', spacetime_check_matrix)
@@ -80,7 +80,7 @@ class SpacetimeCode:
             # Construct inactivation_sets by stacking Z checks in time
             inactivation_sets = sparse.hstack([
                 sparse.block_diag(repeat(dual_basis_checks.tocoo(), num_rounds+1)),
-                sparse.coo_matrix(([], ([], [])), shape=(num_rounds*r, num_rounds*r*2))])
+                sparse.coo_matrix(([], ([], [])), shape=measurement_block.shape)]).tocsr()
             assert inactivation_sets.shape[1] == self.spacetime_check_matrix.shape[1]
             object.__setattr__(self, 'inactivation_sets', inactivation_sets)
 
