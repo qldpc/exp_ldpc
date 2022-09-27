@@ -2,6 +2,7 @@ import numpy as np
 from ldpc import bp_decoder, bposd_decoder
 import stim
 import qldpc
+from qldpc.linalg import gf2_linsolve
 from qldpc import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpacetimeCode
 from galois import GF2
 from functools import partial
@@ -89,21 +90,29 @@ class SIBPDCorrection():
     _bpd : None
     _priors : np.array
     _si_max_iter : int
+    _qubit_adjacency : Dict
 
     def __init__(self, code : qldpc.QuantumCodeChecks, rounds : int, bp_options : Dict, priors : Tuple[float, float]):
         data_prior, measurement_prior = priors
 
         object.__setattr__(self, '_si_max_iter', bp_options['si_cutoff'])
+        # Make spacetime code
         object.__setattr__(self, '_spacetime_code', SpacetimeCode(code.checks.z, rounds, dual_basis_checks = code.checks.x))
 
-        
+        # Find qubit boundary in Tanner graph (used for zeroing syndrome when performing stabilizer inactivation)
+        st_check_matrix_csc = self._spacetime_code.spacetime_check_matrix.tocsc()
+        qubit_adjacency = dict()
+        for j in range(st_check_matrix_csc.shape[1]):
+            qubit_adjacency[j] = frozenset(st_check_matrix_csc.getcol(j).nonzero()[0])
+        object.__setattr__(self, '_qubit_adjacency', qubit_adjacency)
 
+        # Set the prior
         channel_prior = np.zeros(self._spacetime_code.spacetime_check_matrix.shape[1])
         self._spacetime_code.data_bits(channel_prior)[:] = data_prior
         self._spacetime_code.measurement_bits(channel_prior)[:] = measurement_prior
         object.__setattr__(self, '_priors', channel_prior)
 
-        
+        # Create BP object
         object.__setattr__(self, '_bpd', bp_decoder(
             self._spacetime_code.spacetime_check_matrix,
             channel_probs = self._priors,
@@ -117,36 +126,34 @@ class SIBPDCorrection():
         row_nonzero, col_nonzero = self._spacetime_code.inactivation_sets.nonzero()
         for i in range(row_nonzero.shape[0]):
             reliability[row_nonzero[i]] += np.abs(posterior_llr[col_nonzero[i]])
-        return reliability        
+        return reliability
 
     @staticmethod
     def _set_to_indices(a : Set):
         '''Convert a set to a sorted numpy list'''
         return np.sort(np.fromiter(a, int, len(a)))
     
-    def _check_feasible(self, syndrome, deactivated_set) -> Optional[np.array]:
+    def _check_feasible(self, syndrome, deactivated_set, stabilizer_deactivation) -> Optional[np.array]:
         '''Returns a correction supported on deactivated_set explaining syndrome if a solution exists'''
 
+        # We have no erased qubits
         if len(deactivated_set) == 0:
             return (None if np.count_nonzero(syndrome) > 0
-                    else np.zeros(self._spacetime_code.inactivation_sets.shape[1], dtype=np.uint32))
+                    else np.zeros(self._spacetime_code.spacetime_check_matrix.shape[1], dtype=np.uint32))
         
         # We need to get a submatrix of the check matrix with columns deactivated_set and rows for which there is a nonzero entry in deactivate set
-        inactivation_set_csc = self._spacetime_code.inactivation_sets.tocsc()
-        submatrix_rows = self._set_to_indices(set(chain(inactivation_set_csc.getcol(j).nonzero() for j in deactivated_set)))
-        deactivated_set_idx = self._set_to_indices(deactivated_set)
+        deactivated_rows = self._set_to_indices(stabilizer_deactivation)
+        deactivated_cols = self._set_to_indices(deactivated_set)
         
         # Solve syndrome equation for the submatrix induced by the deactivated set
-        check_submatrix = inactivation_set_csc[submatrix_rows, deactivated_set_idx].toarray()
-
-        syndrome_submatrix = syndrome[submatrix_rows]
-        augmented = GF2(np.hstack([check_submatrix, syndrome_submatrix[:,np.newaxis]]))
-        augmented.row_reduce(ncols = min(augmented.shape[1]-1, augmented.shape[0]))
-        solution_vec = augmented[:, augmented.shape[1]-1]
-
-        if check_submatrix @ solution_vec == syndrome_submatrix:
+        check_submatrix = self._spacetime_code.spacetime_check_matrix[deactivated_rows, :][:, deactivated_cols].toarray()
+        syndrome_submatrix = syndrome[deactivated_rows]
+        solution_vec = gf2_linsolve(check_submatrix, syndrome_submatrix)
+        
+        # If we get a solution then bring it back to the full vector space
+        if solution_vec is not None:
             correction = np.zeros(self._spacetime_code.inactivation_sets.shape[1], dtype=np.uint32)
-            correction[submatrix_rows] = np.array(solution_vec)
+            correction[deactivated_cols] = np.array(solution_vec, dtype=np.uint32)
             return correction
         else:
             return None
@@ -155,6 +162,8 @@ class SIBPDCorrection():
         syndrome = self._spacetime_code.syndrome_from_history(history, readout)
 
         deactivated_set = set()
+        stabilizer_deactivation = set()
+        deactivated_syndrome = syndrome
 
         stabilizer_ranking = None
         for si_iter in range(self._si_max_iter):
@@ -164,14 +173,15 @@ class SIBPDCorrection():
             self._bpd.update_channel_probs(bp_prior)
             
             # Run BP
-            correction = self._bpd.decode(syndrome)
+            deactivated_syndrome[self._set_to_indices(stabilizer_deactivation)] = 0
+            correction = self._bpd.decode(deactivated_syndrome)
 
             # Check (exit condition) that the deactivated set supports a correction 
             if self._bpd.converge == 1:
                 residual_syndrome = (syndrome + self._spacetime_code.spacetime_check_matrix @ correction)%2
-                total_correction = self._check_feasible(residual_syndrome, deactivated_set)
-                if total_correction is not None:
-                    correction = total_correction
+                erasure_correction = self._check_feasible(residual_syndrome, deactivated_set, stabilizer_deactivation)
+                if erasure_correction is not None:
+                    correction = (correction + erasure_correction)%2
                     break
 
             # Compute reliability if it has not yet been computed
@@ -180,7 +190,10 @@ class SIBPDCorrection():
                 stabilizer_ranking = np.argsort(reliability)
             
             # Deactivate stabilizer at ranking si_iter
-            deactivated_set.update(frozenset(self._spacetime_code.inactivation_sets[stabilizer_ranking[si_iter]].nonzero()[1]))            
+            new_deactivation = frozenset(self._spacetime_code.inactivation_sets.getrow(stabilizer_ranking[si_iter]).nonzero()[1])
+            deactivated_set.update(new_deactivation)
+            for qubit in new_deactivation:
+                stabilizer_deactivation.update(self._qubit_adjacency[qubit])
 
 
 
@@ -305,7 +318,7 @@ def run_simulation(samples, code, meas_prior, data_prior, noise_model, noise_mod
 
     logical_values = []
     for i in range(samples):
-        batch01 = np.where(batch[i], 1, 0)
+        batch01 = np.where(batch[i], 1, 0).astype(np.uint32)
         if detectors:
             corrected_logicals = decoder.readout_correction(batch01)
             logical_values.append(np.any(corrected_logicals != 0))

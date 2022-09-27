@@ -55,8 +55,8 @@ class SpacetimeCode:
         r = check_matrix.shape[0]
 
         # Add measurement failure bits    
-        measurement_block_i = np.zeros(num_rounds*r*2)
-        measurement_block_j = np.zeros(num_rounds*r*2)
+        measurement_block_i = np.zeros(num_rounds*r*2, dtype=np.uint32)
+        measurement_block_j = np.zeros(num_rounds*r*2, dtype=np.uint32)
 
         for i, pair in enumerate((i*r + j, (i+1)*r + j) for i in range(num_rounds) for j in range(r)):
             x1, x2 = pair
@@ -109,7 +109,7 @@ def _spacetime_syndrome(rounds : int, check_matrix : sparse.spmatrix, syndrome_h
     '''Convert a syndrome history + transverse readout into a syndrome for the spacetime code'''
     # number of checks
     r = check_matrix.shape[0]
-    syndrome = np.zeros((rounds+1)*r)
+    syndrome = np.zeros((rounds+1)*r, dtype=np.uint32)
 
     # Get syndrome
     for i in range(0, rounds):

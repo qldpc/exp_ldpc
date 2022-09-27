@@ -7,21 +7,22 @@ def gf2_linsolve(A : np.array, b : np.array) -> Optional[np.array]:
 
     # Convert A to RREF
     augmented = GF2(np.hstack([A, b[:,np.newaxis]]))
-    aug_rref = augmented.row_reduce(ncols = min(augmented.shape[1]-1, augmented.shape[0]))
-    # Use RREF to try to reduce b (Is this right?)
-    # We should probably just evaluate a mat-vec product on the RREF'd subspace
-    aug_rref_rank = np.sum(~np.all(aug_rref == 0, axis=1))
-    solution_vec = aug_rref.tranpose().row_reduce(ncols = aug_rref_rank)[aug_rref.shape[1], :]
+    ident_block_size = min(A.shape[0], A.shape[1])
+    aug_rref = augmented.row_reduce(ncols = A.shape[1])
+    pivots = gf2_get_pivots(aug_rref[:,:-1])
 
-    if (A@solution_vec)%2 == b:
-        return solution_vec
+    candidate_soln = np.zeros(A.shape[1], dtype=np.uint32)
+
+    candidate_soln[pivots] = np.array(aug_rref[:len(pivots), -1])
+
+    if ((A@candidate_soln)%2 == b).all():
+        return candidate_soln
     else:
         return None
 
 def gf2_get_pivots(A : np.array) -> List[int]:
     largest_index = (A!=0).argmax(axis=1)
     return np.extract(A[range(A.shape[0]), largest_index]!=0, largest_index)
-
 
 def get_rank(A : np.array) -> int:
     return np.linalg.matrix_rank(GF2(A))
