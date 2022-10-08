@@ -19,6 +19,21 @@ _checks =  [[10, 30, 40], [5, 32, 45], [16, 18, 39], [12, 22, 38], [15, 19, 47],
     [6, 27, 43], [11, 30, 46], [7, 31, 35], [5, 20, 36], [14, 17, 38], [16, 28, 45], [4, 32, 37], 
     [13, 23, 33], [12, 26, 44], [3, 29, 48], [2, 24, 39], [10, 19, 34]]
 
+def test_belief_prop_small():
+    check_matrix = sparse.csr_matrix(np.array([[1,1,0],[0,1,1]], dtype=np.uint32))
+
+    for j in range(check_matrix.shape[1]):
+        x = np.zeros(check_matrix.shape[1], dtype=np.uint32)
+        x[j] = 1
+
+        syndrome = (check_matrix @ x)%2
+        llr = -6*np.ones(check_matrix.shape[1])
+
+        bp = BeliefPropagation(check_matrix)
+        correction = bp.decode(syndrome, llr, 10)
+
+        assert np.all(x == correction)
+
 def test_belief_prop():
     check_matrix = sparse.dok_matrix((48, 96), dtype=np.uint32)
     for j, col in enumerate(_checks):
@@ -29,13 +44,12 @@ def test_belief_prop():
     bp = BeliefPropagation(check_matrix)
 
     corrections = []
-    # 16-32 are weak bits. There isn't a good reason for them to be consecutive
-    for i in set(range(check_matrix.shape[1]))-set(range(16,32)):
+    for i in set(range(check_matrix.shape[1])):
         x = np.zeros(check_matrix.shape[1], dtype=np.uint32)
         x[i] = 1
         syndrome = (check_matrix @ x)%2
         llr = -6*np.ones(check_matrix.shape[1])
-        correction = bp.decode(syndrome, llr, 60)
+        correction = bp.decode(syndrome, llr, 30)
         corrections.append((i, correction, x))
 
     print([i for i,c,x in corrections if np.any(c != x)])
