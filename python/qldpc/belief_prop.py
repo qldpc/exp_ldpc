@@ -1,6 +1,7 @@
 import scipy.sparse as sparse
 import numpy as np
-from numba import njit, typed
+import numba
+from numba import njit
 from typing import Dict
 from array import array
 
@@ -25,20 +26,21 @@ def _llr_sum(a_llr, b_llr):
     )
 
 @njit
-def scan_idx(a, j : int) -> int:
-    '''Return i s.t. a[i] = j. Behavior undefined if no such entry exists'''
-    for i in range(a.shape[0]):
+def scan_idx(a, n : int, j : int) -> int:
+    '''Return i s.t. a[i] = j. Behavior undefined if no such entry exists. n is the length of a'''
+    for i in range(n):
         if a[i] == j:
             return i
+    return -1
 
 @njit
-def scan_deg(a) -> int:
+def scan_deg(a, n : int) -> int:
     '''Return a past-the-end index for range of valid entries'''    
-    for i in range(a.shape[0]):
+    for i in range(n):
         if a[i] < 0:
             return i
     else:
-        return a.shape[0]
+        return n
 
 class BeliefPropagation:
     _check_to_bit : np.array
@@ -79,15 +81,6 @@ class BeliefPropagation:
         # For cache locality purposes, we could split the variables into sets and we update the sets a few times before moving to the next one
         # Ex. we hammer a single time slice at time
 
-        num_bits = self._bit_to_check.shape[0]
-        max_bit_degree = self._bit_to_check.shape[1]
-        num_checks = self._check_to_bit.shape[0]
-        max_check_degree = self._check_to_bit.shape[1]
-
-        f_llr = np.zeros(max_check_degree)
-        b_llr = np.zeros(max_check_degree)
-        gathered_m_v_to_c = np.zeros(max_check_degree)
-        
         # Max magnitude we permit the check to bit messages to have
         # This is necessary because the LLRs will run to +/- inf after BP converges
         # Once that happens, eventually the update rule will start to run into round-off error and the updates will oscillate wildly
@@ -96,24 +89,49 @@ class BeliefPropagation:
 
         if harden is None:
             harden = True
-        
+
         syndrome_R = np.where(syndrome == 0, 1, -1)
+
+        max_bit_degree = self._bit_to_check.shape[1]
+        max_check_degree = self._check_to_bit.shape[1]
+
+        llr = decode_jit(syndrome_R, llr_prior, iterations, clamp_llr,
+            _bit_to_check=self._bit_to_check, _check_to_bit=self._check_to_bit, # Normally this would be a class member
+            _max_check_degree=max_check_degree, _max_bit_degree=max_bit_degree)
+        
+        return np.where(llr > 0, 1, 0).astype(np.uint32) if harden else llr
+
+@njit
+def decode_jit(syndrome_R, llr_prior, iterations, clamp_llr,
+    _bit_to_check, _check_to_bit, _max_check_degree : int, _max_bit_degree : int) -> np.array:
+
+        # We want to specialize on this to allow a bunch of the inner loops to be unrolled
+        numba.literally(_max_check_degree)
+        numba.literally(_max_bit_degree)
+
+        num_bits = _bit_to_check.shape[0]
+        num_checks = _check_to_bit.shape[0]
+
+        f_llr = np.zeros(_max_check_degree)
+        b_llr = np.zeros(_max_check_degree)
+        gathered_m_v_to_c = np.zeros(_max_check_degree)
+        
         # The messages here are stored at the source
         # We would eventually like to store them at the target
-        messages_v_to_c = np.zeros_like(self._bit_to_check)
-        messages_c_to_v = np.zeros_like(self._check_to_bit)
+        messages_v_to_c = np.zeros_like(_bit_to_check)
+        messages_c_to_v = np.zeros_like(_check_to_bit)
         
         llr = np.copy(llr_prior)
         for _ in range(iterations):
             # ===== v -> c =====
             for bit in range(num_bits):
                 # Step along the row in the bit to check adjacency structure
-                bit_degree = scan_deg(self._bit_to_check[bit, :])
+                bit_degree = scan_deg(_bit_to_check[bit, :], _max_bit_degree)
                 for check_j in range(bit_degree):
-                    check = self._bit_to_check[bit, check_j]
+                    check = _bit_to_check[bit, check_j]
 
                     # Find the index of the bit in the check_to_bit adjacency structure
-                    bit_j = scan_idx(self._check_to_bit[check, :], bit)
+                    bit_j = scan_idx(_check_to_bit[check, :], _max_check_degree, bit)
                     
                     # Compute message
                     messages_v_to_c[bit, check_j] = llr[bit] - messages_c_to_v[check, bit_j]
@@ -122,13 +140,13 @@ class BeliefPropagation:
             for check in range(num_checks):
                 # We need to handle the case where check_list has 1 element
                 gathered_m_v_to_c[:] = np.nan
-                check_degree = scan_deg(self._check_to_bit[check,:])
+                check_degree = scan_deg(_check_to_bit[check,:], _max_check_degree)
 
                 # Gather incoming messages
-                for bit_j in range(0, check_degree):
+                for bit_j in range(_max_check_degree):
                     # Look up incoming message
-                    bit = self._check_to_bit[check,bit_j]
-                    check_j = scan_idx(self._bit_to_check[bit, :], check)
+                    bit = _check_to_bit[check,bit_j]
+                    check_j = scan_idx(_bit_to_check[bit, :], _max_bit_degree, check)
                     gathered_m_v_to_c[bit_j] = messages_v_to_c[bit, check_j]
 
                 # Jacobian update from Chen et al. (2005)
@@ -163,12 +181,12 @@ class BeliefPropagation:
 
             # Update priors with passed messages
             for check in range(num_checks):
-                for bit_j in range(max_check_degree):
-                    bit = self._check_to_bit[check, bit_j]
+                for bit_j in range(_max_check_degree):
+                    bit = _check_to_bit[check, bit_j]
                     if bit >= 0:
                         llr[bit] += messages_c_to_v[check, bit_j]
 
             # if self.check_converged(llr, syndrome):
             #     break
                     
-        return np.where(llr > 0, 1, 0).astype(np.uint32) if harden else llr
+        return llr
