@@ -4,7 +4,7 @@ from numba import njit, typed
 from typing import Dict
 from array import array
 
-# @njit
+@njit
 def _log1pexp(x):
     '''Compute Log[1+Exp[x]] without overflowing in the exp.
     The discontinuity at 32 is about 1e-15'''
@@ -12,7 +12,7 @@ def _log1pexp(x):
     transition = 32
     return x if x > transition else np.log1p(np.exp(x))
 
-# @njit
+@njit
 def _llr_sum(a_llr, b_llr):
     '''Numerically stable way to compute the llr of (a + b). Equation (6) of Chen et al. IEEE Trans. Comm. 53 (8) 1288-1299 (2005)'''
     ab_sum = np.abs(a_llr + b_llr)
@@ -24,20 +24,16 @@ def _llr_sum(a_llr, b_llr):
         - _log1pexp(ab_diff)
     )
 
-# @njit
+@njit
 def scan_idx(a, j : int) -> int:
     '''Return i s.t. a[i] = j. Behavior undefined if no such entry exists'''
-    assert len(a.shape) == 1
     for i in range(a.shape[0]):
         if a[i] == j:
             return i
-    assert False
 
-# @njit
+@njit
 def scan_deg(a) -> int:
-    '''Return a past-the-end index for range of valid entries'''
-    assert len(a.shape) == 1
-    
+    '''Return a past-the-end index for range of valid entries'''    
     for i in range(a.shape[0]):
         if a[i] < 0:
             return i
