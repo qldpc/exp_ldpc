@@ -5,7 +5,7 @@ from numba import njit
 from typing import Dict
 from array import array
 
-@njit
+@njit(numba.float64(numba.float64), inline='always')
 def _log1pexp(x):
     '''Compute Log[1+Exp[x]] without overflowing in the exp.
     The discontinuity at 32 is about 1e-15'''
@@ -13,7 +13,7 @@ def _log1pexp(x):
     transition = 32
     return x if x > transition else np.log1p(np.exp(x))
 
-@njit
+@njit(numba.float64(numba.float64, numba.float64), inline='always')
 def _llr_sum(a_llr, b_llr):
     '''Numerically stable way to compute the llr of (a + b). Equation (6) of Chen et al. IEEE Trans. Comm. 53 (8) 1288-1299 (2005)'''
     ab_sum = np.abs(a_llr + b_llr)
@@ -25,7 +25,7 @@ def _llr_sum(a_llr, b_llr):
         - _log1pexp(ab_diff)
     )
 
-@njit
+@njit(numba.uint32(numba.uint32[:], numba.uint32, numba.uint32), inline='always')
 def scan_idx(a, n : int, j : int) -> int:
     '''Return i s.t. a[i] = j. Behavior undefined if no such entry exists. n is the length of a'''
     for i in range(n):
@@ -33,9 +33,9 @@ def scan_idx(a, n : int, j : int) -> int:
             return i
     return -1
 
-@njit
+@njit(numba.uint32(numba.uint32[:], numba.uint32), inline='always')
 def scan_deg(a, n : int) -> int:
-    '''Return a past-the-end index for range of valid entries'''    
+    '''Return a past-the-end index for range of valid entries'''
     for i in range(n):
         if a[i] < 0:
             return i
@@ -105,9 +105,9 @@ class BeliefPropagation:
 def decode_jit(syndrome_R, llr_prior, iterations, clamp_llr,
     _bit_to_check, _check_to_bit, _max_check_degree : int, _max_bit_degree : int) -> np.array:
 
-        # We want to specialize on this to allow a bunch of the inner loops to be unrolled
-        numba.literally(_max_check_degree)
-        numba.literally(_max_bit_degree)
+        # # We want to specialize on this to allow a bunch of the inner loops to be unrolled
+        # numba.literally(_max_check_degree)
+        # numba.literally(_max_bit_degree)
 
         num_bits = _bit_to_check.shape[0]
         num_checks = _check_to_bit.shape[0]
