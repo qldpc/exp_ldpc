@@ -168,7 +168,6 @@ class SIBPDCorrection():
         stabilizer_deactivation = set()
         deactivated_syndrome = syndrome
 
-        stabilizer_ranking = None
         for si_iter in range(self._si_max_iter):
             # Set prior with deactivated set
             bp_prior = np.copy(self._llr_prior)
@@ -179,7 +178,7 @@ class SIBPDCorrection():
             llr = self._bpd.decode(deactivated_syndrome, bp_prior, self._bp_iters, harden=False, clamp_llr=1e3)
             if len(deactivated_set) > 0:
                 assert np.all(llr[self._set_to_indices(deactivated_set)] == 0.0)
-            # print(f'LLR at {si_iter}: {llr}')
+
             correction = np.where(llr > 0, 1, 0).astype(np.uint32)
             # Check (exit condition) that the deactivated set supports a correction 
             # if self._bpd.converge == 1:
@@ -191,14 +190,12 @@ class SIBPDCorrection():
                 break
 
             # Compute reliability if it has not yet been computed
-            if stabilizer_ranking is None:
-                reliability = self._compute_reliability(llr)
-                stabilizer_ranking = np.argsort(reliability)
+            reliability = self._compute_reliability(llr)
+            reliability = np.where(reliability > 0, reliability, np.inf)
             
-            # Deactivate stabilizer at ranking si_iter
-            deactivated_set = frozenset(self._spacetime_code.inactivation_sets.getrow(stabilizer_ranking[si_iter]).nonzero()[1])
-            stabilizer_deactivation = set()
-            for qubit in deactivated_set:
+            new_deactivation = frozenset(self._spacetime_code.inactivation_sets.getrow(np.argmin(reliability)).nonzero()[1])
+            deactivated_set.update(new_deactivation)
+            for qubit in new_deactivation:
                 stabilizer_deactivation.update(self._qubit_adjacency[qubit])
         else:
             print('Decoder timeout')
