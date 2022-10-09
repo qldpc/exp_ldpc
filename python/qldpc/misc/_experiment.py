@@ -3,7 +3,7 @@ from ldpc import bp_decoder, bposd_decoder
 import stim
 import qldpc
 from qldpc.linalg import gf2_linsolve
-from qldpc import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpacetimeCode
+from qldpc import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpacetimeCode, BeliefPropagation
 from galois import GF2
 from functools import partial
 from itertools import chain
@@ -88,7 +88,8 @@ class BPOSDCorrect():
 class SIBPDCorrection():
     _spacetime_code : SpacetimeCode
     _bpd : None
-    _priors : np.array
+    _llr_prior : np.array
+    _bp_iters : int
     _si_max_iter : int
     _qubit_adjacency : Dict
 
@@ -110,14 +111,16 @@ class SIBPDCorrection():
         channel_prior = np.zeros(self._spacetime_code.spacetime_check_matrix.shape[1])
         self._spacetime_code.data_bits(channel_prior)[:] = data_prior
         self._spacetime_code.measurement_bits(channel_prior)[:] = measurement_prior
-        object.__setattr__(self, '_priors', channel_prior)
+        object.__setattr__(self, '_llr_prior', np.log(channel_prior/(1-channel_prior)))
 
         # Create BP object
-        object.__setattr__(self, '_bpd', bp_decoder(
-            self._spacetime_code.spacetime_check_matrix,
-            channel_probs = self._priors,
-            bp_method = 'psl', max_iter = bp_options['max_iter']),
-        )
+        object.__setattr__(self, '_bpd', BeliefPropagation(self._spacetime_code.spacetime_check_matrix))
+        object.__setattr__(self, '_bp_iters', bp_options['max_iter'])
+        # object.__setattr__(self, '_bpd', bp_decoder(
+        #     self._spacetime_code.spacetime_check_matrix,
+        #     channel_probs = self._priors,
+        #     bp_method = 'psl', max_iter = bp_options['max_iter']),
+        # )
 
     def _compute_reliability(self, posterior_llr : np.array) -> np.array:
         '''Compute reliability of stabilizer generators'''
@@ -168,33 +171,37 @@ class SIBPDCorrection():
         stabilizer_ranking = None
         for si_iter in range(self._si_max_iter):
             # Set prior with deactivated set
-            bp_prior = self._priors
-            bp_prior[self._set_to_indices(deactivated_set)] = 0.5
-            self._bpd.update_channel_probs(bp_prior)
+            bp_prior = np.copy(self._llr_prior)
+            bp_prior[self._set_to_indices(deactivated_set)] = 0.0
             
             # Run BP
             deactivated_syndrome[self._set_to_indices(stabilizer_deactivation)] = 0
-            correction = self._bpd.decode(deactivated_syndrome)
-
+            llr = self._bpd.decode(deactivated_syndrome, bp_prior, self._bp_iters, harden=False, clamp_llr=1e3)
+            if len(deactivated_set) > 0:
+                assert np.all(llr[self._set_to_indices(deactivated_set)] == 0.0)
+            # print(f'LLR at {si_iter}: {llr}')
+            correction = np.where(llr > 0, 1, 0).astype(np.uint32)
             # Check (exit condition) that the deactivated set supports a correction 
-            if self._bpd.converge == 1:
-                residual_syndrome = (syndrome + self._spacetime_code.spacetime_check_matrix @ correction)%2
-                erasure_correction = self._check_feasible(residual_syndrome, deactivated_set, stabilizer_deactivation)
-                if erasure_correction is not None:
-                    correction = (correction + erasure_correction)%2
-                    break
+            # if self._bpd.converge == 1:
+            residual_syndrome = (syndrome + self._spacetime_code.spacetime_check_matrix @ correction)%2
+            erasure_correction = self._check_feasible(residual_syndrome, deactivated_set, stabilizer_deactivation)
+            if erasure_correction is not None:
+                print(f'Break at {si_iter=}')
+                correction = (correction + erasure_correction)%2
+                break
 
             # Compute reliability if it has not yet been computed
             if stabilizer_ranking is None:
-                reliability = self._compute_reliability(self._bpd.log_prob_ratios)
+                reliability = self._compute_reliability(llr)
                 stabilizer_ranking = np.argsort(reliability)
             
             # Deactivate stabilizer at ranking si_iter
-            new_deactivation = frozenset(self._spacetime_code.inactivation_sets.getrow(stabilizer_ranking[si_iter]).nonzero()[1])
-            deactivated_set.update(new_deactivation)
-            for qubit in new_deactivation:
+            deactivated_set = frozenset(self._spacetime_code.inactivation_sets.getrow(stabilizer_ranking[si_iter]).nonzero()[1])
+            stabilizer_deactivation = set()
+            for qubit in deactivated_set:
                 stabilizer_deactivation.update(self._qubit_adjacency[qubit])
-
+        else:
+            print('Decoder timeout')
 
 
         return self._spacetime_code.final_correction(correction)
