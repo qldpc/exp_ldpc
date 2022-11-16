@@ -25,27 +25,21 @@ def test_noise_rewrite_pheno():
     targets = CircuitTargets([1], [0,2], [])
     rewritten_circuit = depolarizing_noise(0.1, 0.2).rewrite(targets, circuit)
 
-
-    print(rewritten_circuit)
     golden = [
         'RX 0 1 2',
         'TICK',
         'CZ 0 1',
-        'DEPOLARIZE1(0.1) 1',
         'TICK',
+        'DEPOLARIZE1(0.1) 1',
         'MX(0.2) 0 2',
         'TICK',
-        'DEPOLARIZE1(0.1) 1',
         'TICK',
+        'DEPOLARIZE1(0.1) 1',
         'MX(0.2) 0',
     ]
     
     # Golden test for now
     assert list(rewritten_circuit) == golden
-    assert rewritten_circuit[4] == 'DEPOLARIZE1(0.1) 1'
-    assert rewritten_circuit[5] == 'MX(0.2) 0 2'
-    assert rewritten_circuit[8] == 'DEPOLARIZE1(0.1) 1'
-    assert rewritten_circuit[9] == 'MX(0.2) 0'
 
 def test_noise_rewrite_circuit_noise():
     circuit = [

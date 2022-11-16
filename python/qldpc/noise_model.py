@@ -1,7 +1,8 @@
+
 from collections import deque
 import string
 from typing import Iterable, Deque, List, Callable, Tuple
-from itertools import chain
+from itertools import chain, islice
 from .qecc_util import NoiseRewriter, CircuitTargets
 from functools import partial
 from warnings import warn
@@ -154,9 +155,16 @@ def _apply_noise_pred_impl(
 
     noisy_circuit = deque()
     for timestep in circuit_ticks(circuit):
-        if predicate(targets, timestep):
+        if len(timestep) > 0 and predicate(targets, timestep):
             # Add noise
-            # We need to check if the TICK annotation is present so we can put the noise before after it
+            first_timestep_line = timestep[0]
+            tokens = list(tokenize_line(first_timestep_line))
+            noise_insert  = len(tokens) > 0 and tokens[0] == 'TICK'
+
+            if noise_insert:
+                noisy_circuit.append(first_timestep_line)
+                timestep = islice(timestep, 1, None) if len(timestep) > 1 else []
+                
             noisy_circuit.extend(noise_before(targets))
             noisy_circuit.extend(line_rewriter(targets, line) for line in timestep)
             noisy_circuit.extend(noise_after(targets))
