@@ -2,7 +2,7 @@ from itertools import chain
 from collections import deque
 
 from qldpc import build_storage_simulation, CircuitTargets
-from qldpc.noise_model import depolarizing_noise
+from qldpc.noise_model import depolarizing_noise, circuit_noise
 from qldpc.storage_sim import build_perfect_circuit
 from qldpc.code_examples import random_test_hgp
 
@@ -10,7 +10,7 @@ import stim
 import numpy as np
 import pytest
 
-def test_noise_rewrite():
+def test_noise_rewrite_pheno():
     circuit = [
         'RX 0 1 2',
         'TICK',
@@ -25,12 +25,63 @@ def test_noise_rewrite():
     targets = CircuitTargets([1], [0,2], [])
     rewritten_circuit = depolarizing_noise(0.1, 0.2).rewrite(targets, circuit)
 
+
+    print(rewritten_circuit)
+    golden = [
+        'RX 0 1 2',
+        'TICK',
+        'CZ 0 1',
+        'DEPOLARIZE1(0.1) 1',
+        'TICK',
+        'MX(0.2) 0 2',
+        'TICK',
+        'DEPOLARIZE1(0.1) 1',
+        'TICK',
+        'MX(0.2) 0',
+    ]
+    
     # Golden test for now
+    assert list(rewritten_circuit) == golden
     assert rewritten_circuit[4] == 'DEPOLARIZE1(0.1) 1'
     assert rewritten_circuit[5] == 'MX(0.2) 0 2'
     assert rewritten_circuit[8] == 'DEPOLARIZE1(0.1) 1'
     assert rewritten_circuit[9] == 'MX(0.2) 0'
 
+def test_noise_rewrite_circuit_noise():
+    circuit = [
+        'RX 0 1 2',
+        'TICK',
+        'CZ 0 1',
+        'TICK',
+        'MX 0 2',
+        'TICK',
+        'TICK',
+        'MX 0',
+    ]
+
+    targets = CircuitTargets([1], [0,2], [])
+    rewritten_circuit = circuit_noise(0.1, 0.2).rewrite(targets, circuit)
+
+    golden = [
+        'RX 0 1 2',
+        'DEPOLARIZE1(0.1) 0 1 2',
+        'TICK',
+        'CZ 0 1',
+        'DEPOLARIZE2(0.1) 0 1',
+        'DEPOLARIZE1(0.1) 2',
+        'TICK',
+        'MX(0.2) 0 2',
+        'DEPOLARIZE1(0.1) 0 1 2',
+        'TICK',
+        'DEPOLARIZE1(0.1) 0 1 2',
+        'TICK',
+        'MX(0.2) 0',
+        'DEPOLARIZE1(0.1) 0 1 2'
+    ]
+
+    # Golden test for now
+    assert list(rewritten_circuit) == golden
+    
 def test_ancilla_targets():
     # Reconstruct the checks from the syndrome extraction circuit and verify they match the code
     code = random_test_hgp(compute_logicals=False)
