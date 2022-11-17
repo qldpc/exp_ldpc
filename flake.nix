@@ -26,6 +26,9 @@
             ps.stim
             ps.ldpc
 
+            ps.pytest
+            ps.pdoc3
+            
             ps.numpy
             ps.pandas
             ps.scipy

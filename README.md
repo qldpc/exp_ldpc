@@ -5,20 +5,22 @@
 This repository contains (WIP) research code related to practical implementation of general qLDPC codes.
 It is distributed under an MIT license and will eventually be publically open source, but for the moment I ask that you ask for permission before sharing the sources.
 
+Please look at the scripts in `/scripts` for usage instructions.
+
 ### Caveats
-I have made attempts to test as many pieces as possible, but this is an incomplete research code in an area where many algorithms do not have precise proofs of correctness and thus are difficult to test in pieces.
+There are a few corners of the codebase that are somewhat incomplete, like the Rust decoders, and the documentation is still somewhat sparse
 
-In particular, while much of the python codebase has good test coverage, the decoders are still fairly experimental.
-The only *real* test that can be done is a full end to end simulation which this codebase has not yet gone through in its incomplete state.
-
-This will change over the coming months as time permits.
-The routines are also not super well documented, but this will change when they need to be used by someone other than me.
+## Documentation
+Generate documentation with `pdoc`
+```bash
+pdoc -o docs --html qldpc
+```
 
 ## Layout
 This is organized as a Python library for generating quantum codes, generating syndrome extraction circuits, and setting up QEC experiments.
 In particular, there is a python package `qldpc` and some python scripts to do stuff with it in `/scripts`.
-The python package will work without the rust library, but the only installation method is currently through PEP 517 + maturin instead of setuptools.
 
+The python package will work without the rust library, but the only installation method is currently through PEP 517 + maturin instead of setuptools.
 There is an (incomplete) Rust library for decoding.
 
 The circuits are output in the Cirq language and can be sampled using Stim (see `/scripts`).
