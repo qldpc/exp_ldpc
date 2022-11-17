@@ -29,19 +29,38 @@ def lift_line_pred(line_predicate : Callable[[CircuitTargets, str], bool]) -> Ca
 
 def circuit_ticks(circuit : Iterable[str]) -> Deque[Deque[str]]:
     '''Returns a list of subcircuits separated by a TICK.'''
+  
     subcircuits = deque()
     subcircuits.append(deque())
     circuit_iter = iter(circuit)
     while True:
+        last_tick = True
         try:
             line = next(circuit_iter)
-            tokens = list(tokenize_line(line))
-            if len(tokens) > 0 and tokens[0] == 'TICK':
-                subcircuits.append(deque())
+            tokens = list(tokenize_line(line)) 
+            if len(tokens) > 0:
+                # Repeat blocks are fine as long as we don't need to carry state into or out of them
+                if (tokens[0] == 'REPEAT' or tokens[0] == '}') and not last_tick:
+                    warn('''
+                    This circuit has control flow. Circuit tick detection has minimal handling for control flow.
+                    Do one of the following or you may get incorrect circuit timestep detection.
+                    - Put the repeat block into the form
+                    TICK
+                    REPEAT n {
+                    ...
+                    ...
+                    TICK
+                    }
+                    - flatten the circuit first''')
 
-            if len(tokens) > 0 and tokens[0] == 'REPEAT':
-                warn('This circuit has control flow. Circuit tick detection does not handle control flow yet. Please flatten the circuit first or you may get incorrect circuit timesteps.') 
+                if tokens[0] == 'TICK':
+                    subcircuits.append(deque())
+                    last_tick = True
+                else:
+                    last_tick = False
 
+            # keep track of the previous line so we can warn when the control flow is not simple
+            prev_line_token = tokens[0]
             subcircuits[-1].append(line)
         except StopIteration:
             break
