@@ -133,7 +133,7 @@ class CircuitTargets:
 
 @dataclass(frozen=True)
 class NoiseRewriter:
-    rewrite : Callable[[Iterable[str]], Iterable[str]]
+    rewrite : Callable[[CircuitTargets, Iterable[str]], Iterable[str]]
 
 def num_rows(a : np.array) -> int:
     assert(len(a.shape) == 2)

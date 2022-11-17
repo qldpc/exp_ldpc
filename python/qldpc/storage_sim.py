@@ -148,12 +148,14 @@ def build_storage_simulation(rounds : int, noise_model : NoiseRewriter, code : Q
         
         if rounds > 1:
             # Steady state rounds
+            circuit.append(f'TICK')
             circuit.append(f'REPEAT {rounds-1} {{')
             circuit.extend(syndrome_extraction_circuit)
             circuit.append('SHIFT_COORDS(1, 0)')
             # Detector annotations
             circuit.extend(f'DETECTOR(0, {i}) rec[{i-measurements_per_round}] rec[{i-2*measurements_per_round}]'
                                       for i in range(measurements_per_round))
+            circuit.append('TICK')
             circuit.append('}')
 
     # ===== Final Round =====
