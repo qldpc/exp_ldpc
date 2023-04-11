@@ -1,7 +1,7 @@
 [project]
 name = "qldpc"
 dependencies = [
-"galois==0.0.32",
+"galois",
 # numpy does not use SemVer :(
 "numpy>=1.21&&<1.24",
 "scipy>=1.7",

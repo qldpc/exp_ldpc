@@ -16,16 +16,16 @@
 
 buildPythonPackage rec {
   pname = "stim";
-  version = "1.9.0";
-  format = "pyproject";
+  version = "1.11.0";
+  format = "setuptools";
 
   disabled = pythonOlder "3.6";
 
   src = pkgs.fetchFromGitHub {
     owner = "quantumlib";
     repo = "Stim";
-    rev = "2a7faf788195653f7ab55a09fa52a613b8bd1b03";
-    sha256 = "sha256-/YVIwxolQTp2G1vB8CAbTsRUrsnznIB1RVTKC1oZvH8=";
+    rev = "refs/tags/v${version}";
+    hash = "sha256-aBBfloINUwdWgKz6NrKa/BH/teZhF8qTqc/N5ohMUUA=";
   };
 
   propagatedBuildInputs = [
@@ -33,7 +33,7 @@ buildPythonPackage rec {
     pybind11
   ];
 
-  checkInputs = [
+  nativeCheckInputs = [
     pytestCheckHook
     pytest-xdist
 
@@ -57,11 +57,11 @@ buildPythonPackage rec {
 
   disabledTestPaths = [
     # No pymatching
-    "glue/sample/src/sinter/_main_test.py"
-    "glue/sample/src/sinter/_decoding_test.py"
-    "glue/sample/src/sinter/_predict_test.py"
-    "glue/sample/src/sinter/_collection_test.py"
-    "glue/sample/src/sinter/_collection_work_manager.py"
-    "glue/sample/src/sinter/_worker_test.py"
+    "glue/sample/src/sinter/main_test.py"
+    "glue/sample/src/sinter/decoding_test.py"
+    "glue/sample/src/sinter/predict_test.py"
+    "glue/sample/src/sinter/collection_test.py"
+    "glue/sample/src/sinter/collection_work_manager.py"
+    "glue/sample/src/sinter/worker_test.py"
   ];
 }

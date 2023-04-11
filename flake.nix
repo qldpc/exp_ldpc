@@ -1,7 +1,7 @@
 {
   description = "A very basic flake";
 
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/release-22.11";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
   outputs = { self, nixpkgs, flake-utils }:
@@ -10,7 +10,7 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           pythonPackageOverlay = import ./packages; 
-          python = pkgs.python39.override {
+          python = pkgs.python310.override {
             packageOverrides = pythonPackageOverlay;
           };
         in rec {

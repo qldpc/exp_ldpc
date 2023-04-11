@@ -3,6 +3,7 @@
 , buildPythonPackage
 , rustPlatform
 , pytestCheckHook
+, pythonRelaxDepsHook
 , numpy
 , scipy
 , networkx
@@ -25,6 +26,8 @@ buildPythonPackage rec {
 
   buildInputs = lib.optionals stdenv.isDarwin [ libiconv ];
 
+  pythonRelaxDeps = [ "galois" "numpy" "networkx"];
+  
   propagatedBuildInputs = [
     numpy
     scipy
