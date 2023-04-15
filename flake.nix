@@ -10,18 +10,18 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           pythonPackageOverlay = import ./packages; 
-          python = pkgs.python310.override {
+          python3 = pkgs.python3.override {
             packageOverrides = pythonPackageOverlay;
           };
         in rec {
           # Basic python interpreter with qldpc package
-          packages.default = python.withPackages (ps: [
+          packages.default = python3.withPackages (ps: [
             ps.qldpc
             ps.stim
             ps.pytest
           ]);
           # Add useful extra packages
-          packages.experiment = python.withPackages (ps: [
+          packages.experiment = python3.withPackages (ps: [
             ps.qldpc
             ps.stim
             ps.ldpc
@@ -34,6 +34,11 @@
             ps.scipy
             ps.matplotlib
           ]);
+          overlays.python3 = (final: prev: {
+            python3 = prev.python3.override {
+              packageOverrides = pythonPackageOverlay;
+            };
+          });
         }
       );
 }
