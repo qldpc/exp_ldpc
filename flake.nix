@@ -8,20 +8,17 @@
     flake-utils.lib.eachDefaultSystem
       (system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
-          pythonPackageOverlay = import ./packages; 
-          python3 = pkgs.python3.override {
-            packageOverrides = pythonPackageOverlay;
-          };
-        in rec {
+          overlays = import ./overlays;
+          pkgs = nixpkgs.legacyPackages.${system}.extend overlays.python;
+        in {
           # Basic python interpreter with qldpc package
-          packages.default = python3.withPackages (ps: [
+          packages.default = pkgs.python3.withPackages (ps: [
             ps.qldpc
             ps.stim
             ps.pytest
           ]);
           # Add useful extra packages
-          packages.experiment = python3.withPackages (ps: [
+          packages.experiment = pkgs.python3.withPackages (ps: [
             ps.qldpc
             ps.stim
             ps.ldpc
@@ -34,11 +31,7 @@
             ps.scipy
             ps.matplotlib
           ]);
-          overlays.python3 = (final: prev: {
-            python3 = prev.python3.override {
-              packageOverrides = pythonPackageOverlay;
-            };
-          });
+          overlays = overlays;
         }
       );
 }

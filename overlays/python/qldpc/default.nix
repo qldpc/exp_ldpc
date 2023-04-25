@@ -15,7 +15,7 @@ buildPythonPackage rec {
   pname = "qldpc";
   version = "0.9.0";
   format = "pyproject";
-  src = ../../.;
+  src = ../../../.;
   nativeBuildInputs = with rustPlatform; [ cargoSetupHook maturinBuildHook ];
 
   cargoDeps = rustPlatform.fetchCargoTarball {
