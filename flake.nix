@@ -1,7 +1,7 @@
 {
-  description = "A very basic flake";
+  description = "Utilies for simulating the performance of decoders for  general quantum LDPC codes";
 
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/release-22.11";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/release-23.05";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
   outputs = { self, nixpkgs, flake-utils }:
