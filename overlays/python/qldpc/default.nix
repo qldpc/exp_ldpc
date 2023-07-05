@@ -8,6 +8,7 @@
 , scipy
 , networkx
 , galois
+, cvxpy
 , libiconv
 }:
 
@@ -26,13 +27,14 @@ buildPythonPackage rec {
 
   buildInputs = lib.optionals stdenv.isDarwin [ libiconv ];
 
-  pythonRelaxDeps = [ "galois" "numpy" "networkx"];
+  pythonRelaxDeps = [ "galois" "numpy" "networkx" "cvxpy"];
   
   propagatedBuildInputs = [
     numpy
     scipy
     networkx
     galois
+    cvxpy
   ];
 
   checkInputs = [
