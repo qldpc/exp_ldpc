@@ -13,12 +13,11 @@ def decode_code(check_matrix, syndrome, prior, passin, iterations):
     # Decoder goes here
     bp = bp_decoder(check_matrix, channel_probs=(prior if passin else None), max_iter=iterations)
 
-    t_i = time()
     correction = bp.decode(syndrome)
-    print('BP Runtime: ', time() - t_i)
 
     return correction
 
+@njit(inline='always')
 def calc_prob_odd_error(ps):
     accumulator = 0.0
     for i in range(len(ps)):
@@ -57,16 +56,13 @@ def run_simulation(samples, passin, code_path, d, p, **kwargs):
     rng = np.random.default_rng()
     
     results = []
-    # t00 = time.time()
 
     phi_distr = get_phidistr(d, p)
     tau = int(np.ceil(3*np.sqrt(code.num_qubits)*d/10.0))
     for _ in range(samples):
-        t_i = time()
         error, prior = sample_error_prior(rng, spacetime_code.spacetime_check_matrix.shape[1], tau, phi_distr)
         error = np.array(error)
 
-        print('whole process of generating error took: ', time() - t_i)
         # if not adding in idle measurements
         # llr_data, prior = sample_phi(spacetime_code.spacetime_check_matrix.shape[1], d, p)
         # error = np.array([np.random.choice([0, 1], p=[1-prob, prob]) for prob in prior])
