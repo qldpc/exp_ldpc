@@ -1,5 +1,5 @@
-from .homological_product_code import homological_product
-from .qecc_util import QuantumCode
+from .homological_product_code import homological_product, get_logicals
+from .qecc_util import QuantumCode, QuantumCodeChecks
 from galois import Poly, GF2
 import numpy as np
 import scipy.linalg as linalg
@@ -11,9 +11,9 @@ def shifts_to_polynomials(a):
     '''
     def scalar_to_poly(s):
         return Poly.Degrees([s])
-    return np.vectorize(scalar_to_poly(s))(a)
+    return np.vectorize(scalar_to_poly)(a)
 
-def quasicyclic_lifted_product_code(quasicyclic_check_matrix, l, check_complex=None, compute_logicals=None) -> QuantumCode:
+def qc_lifted_product_code(quasicyclic_check_matrix, l, check_complex=None, compute_logicals=None) -> QuantumCode:
     '''
     The input matrix is an n x m quasicyclic check matrix with elements in the polynomial ring GF2[x]/(x^l-1)
     '''
@@ -25,20 +25,20 @@ def quasicyclic_lifted_product_code(quasicyclic_check_matrix, l, check_complex=N
         compute_logicals = False
 
     def circulant_reduce(a):
-        return a % Poly.Degrees([l,0])
+        return a % np.array(Poly.Degrees([l,0]))
         
     def identity(size):
-        return numpy.identity(size, dtype=np.uinp32)*Poly.One()
+        return np.identity(size, dtype=np.uint32)*np.array(Poly.One())
         
     def antipode(a):
-        return Poly((l-coeffs)%l)
+        return Poly.Degrees((l-a.nonzero_degrees)%l)
 
     def poly_to_matrix(a):
         return linalg.circulant(a.coefficients(size=l, order='asc').astype(np.uint32))
     
     def embed_binary_matrix(a):
-        a_reduced = circulant_reduce(a)
-        return np.block(np.vectorize(poly_to_matrix)(a_reduced))
+        a_blocks = [[poly_to_matrix(x) for x in row] for row in circulant_reduce(a)]
+        return np.asarray(np.block(a_blocks))
     
 
     partial_A = quasicyclic_check_matrix
@@ -50,15 +50,13 @@ def quasicyclic_lifted_product_code(quasicyclic_check_matrix, l, check_complex=N
         np.kron(identity(partial_A.shape[1]), partial_B)
     ]))
     
-    partial_1_factors = [
+    partial_1 = embed_binary_matrix(np.hstack([
         np.kron(identity(partial_A.shape[0]), partial_B),
         np.kron(partial_A, identity(partial_B.shape[0]))
-    ]
-
-    partial_1 = embed_binary_matrix(np.hstack(partial_1_factors))
+    ]))
 
     if check_complex:
-        assert np.all((partial_1 @ partial_2).data % 2 == 0)
+        assert np.all(np.asarray((partial_1 @ partial_2).data) % 2 == 0)
 
     checks = QuantumCodeChecks(sparse.csc_matrix(partial_2).transpose().astype(np.uint32), sparse.csr_matrix(partial_1).astype(np.uint32))
     logicals = get_logicals(checks, compute_logicals, check_complex)
@@ -66,5 +64,4 @@ def quasicyclic_lifted_product_code(quasicyclic_check_matrix, l, check_complex=N
     
     assert len(logicals.x) == len(logicals.z)
     assert checks.x.shape == checks.z.shape
-    assert checks.num_qubits == (num_data**2 + num_checks**2)
     return code
