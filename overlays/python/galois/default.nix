@@ -13,7 +13,7 @@
 
 buildPythonPackage rec {
   pname = "galois";
-  version = "0.3.3";
+  version = "0.3.5";
   format = "pyproject";
 
   disabled = pythonOlder "3.7";

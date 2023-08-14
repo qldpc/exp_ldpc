@@ -29,6 +29,8 @@ The circuits are output in the Cirq language and can be sampled using Stim (see 
 ### Available Codes Generators
 - General Hypergraph / Homological Product Codes
 - Expander Codes (Hypergraph product codes based on random bipartite graphs)
+- Lifted product codes based on Tanner codes on Cayley graphs of PSL(2,q)
+- Quasicyclic lifted product codes
 
 ### Available Decoders (Currently WIP)
 - Small Set Flip
