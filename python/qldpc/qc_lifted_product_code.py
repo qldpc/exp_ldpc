@@ -15,8 +15,12 @@ def shifts_to_polynomials(a):
 
 def qc_lifted_product_code(quasicyclic_check_matrix, l, check_complex=None, compute_logicals=None) -> QuantumCode:
     '''
-    The input matrix is an n x m quasicyclic check matrix with elements in the polynomial ring GF2[x]/(x^l-1)
+    Returns the quasi-cyclic lifted product code as defined in arxiv:2012.04068 using a matrix representation of the cyclic group.
+    The input matrix is an n x m quasicyclic check matrix with elements in the polynomial ring GF2[x]/(x^l-1).
+    If the input is integers, it will be interpreted as shifts i.e. the entry k will be replaced with x^k.
     '''
+    if quasicyclic_check_matrix.dtype != 'O':
+        quasicyclic_check_matrix = shifts_to_polynomials(quasicyclic_check_matrix)
     
     if check_complex is None:
         check_complex = False
