@@ -8,44 +8,33 @@ from qldpc import SpacetimeCode
 from phi_distribution import *
 from time import time
 from numba import njit
+import numba
+from numba import njit, float64, intp, bool_
+from phi_distribution_generatejson import *
 
 def decode_code(check_matrix, syndrome, prior, passin, iterations):
     # Decoder goes here
-    bp = bp_decoder(check_matrix, channel_probs=(prior if passin else None), max_iter=iterations)
+    if passin:
+        bp = bp_decoder(check_matrix, channel_probs=prior, max_iter=iterations)
+    else:
+        bp = bp_decoder(check_matrix, max_iter=iterations)
 
     correction = bp.decode(syndrome)
-
     return correction
 
-@njit(inline='always')
-def calc_prob_odd_error(ps):
-    accumulator = 0.0
-    for i in range(len(ps)):
-        accumulator = accumulator + ps[i] - 2 * accumulator * ps[i]
-    return accumulator
-
-@njit
-def sample_error_prior_kernel(rng, p_phi_tau):
-    error = np.zeros(p_phi_tau.shape[0], dtype=np.uint32)
-    prior = np.zeros(p_phi_tau.shape[0], dtype=np.float64)
-
-    for i in range(p_phi_tau.shape[0]):
-        mask = np.random.uniform(0.0, 1.0, p_phi_tau.shape[1]) <= p_phi_tau[i,:]
-        x_is = np.where(mask, 1, 0)
-        error_i = np.sum(x_is) % 2
-        error[i] = error_i
-        prior[i] = calc_prob_odd_error(p_phi_tau[i,:])
-    return error, prior
-
-def sample_error_prior(rng, size, tau, phi_distr):
+# @njit
+def sample_error_prior(rng, size, phi_distr):
     # I hope 0 is no error, and 1 is error
-    
-    p_phi_tau = sample_phi(rng, (size,tau), phi_distr)
-    error, prior = sample_error_prior_kernel(rng, p_phi_tau)
-        
+    q_values, phi_freq = phi_distr
+
+    # Sample from the distribution
+    prior = rng.choice(q_values, p=phi_freq, size=size)
+    error = np.random.uniform(0.0, 1.0, prior.shape[0]) <= prior
+
     return error, prior
 
-def run_simulation(samples, passin, code_path, d, p, **kwargs):
+
+def run_simulation(samples, passin, code_path, d, p, r, **kwargs):
 
     with code_path.open() as code_file:
         code = qldpc.read_quantum_code(code_file)
@@ -57,10 +46,11 @@ def run_simulation(samples, passin, code_path, d, p, **kwargs):
     
     results = []
 
-    phi_distr = get_phidistr(d, p)
-    tau = int(np.ceil(3*np.sqrt(code.num_qubits)*d/10.0))
+    tau = int(np.ceil(3*np.sqrt(code.num_qubits)*d/r))
+    phi_distr = get_phidistr(d, p, tau)
+
     for _ in range(samples):
-        error, prior = sample_error_prior(rng, spacetime_code.spacetime_check_matrix.shape[1], tau, phi_distr)
+        error, prior = sample_error_prior(rng, spacetime_code.spacetime_check_matrix.shape[1], phi_distr)
         error = np.array(error)
 
         # if not adding in idle measurements
@@ -92,19 +82,33 @@ def main():
 
     # stupider way to run this:
     code_path = PosixPath('hgp_1.qecc') #vars(args)['code_path']
-    samples = 1 #vars(args)['samples']
+    samples = 10 #vars(args)['samples']
 
-    p = 0.018
-    d = 15
+    ps_7 = [0.009, 0.009525600656, 0.01008189643, 0.01067067991, 0.0112938484, 0.01195340997, 0.01265148998, 0.01339033792, 0.01417233463, 0.015]
+    ps_5 = [0.006, 0.006480358433, 0.006999174237, 0.007559526299, 0.008164740001, 0.008818406954, 0.009524406312, 0.01028692779, 0.01111049655, 0.012]
+
+    p = ps_5[8] #
+    d = 5
+    r = 10
+    syndmeas = 68
+    save_results = False
+
+    actually_save_json(d, p, syndmeas)
+
     passin = True
     print(f'p = {p}, d = {d}, pass_input={passin}')
     results = []
     count = 0
     while True:
         count += 1
-        result = run_simulation(samples, passin, code_path, d, p)
+        result = run_simulation(samples, passin, code_path, d, p, r)
         results.append(result)
         print(f'after {samples*count} runs: {np.average(results)}')
+
+        if save_results:
+            with open(f'bp_decoder_output/d_{d}_p_{p}_r_{r}.txt', "w") as file:
+                file.write(f'after {samples*count} runs: {np.average(results)}')
+
 
 if __name__ == '__main__':
     main()
