@@ -3,6 +3,7 @@ import os
 import ast
 from collections import defaultdict
 import re
+import subprocess
 
 def actually_save_json(d, p, syndmeas):
     direc = "/Users/nadinemeister/Dropbox/My Mac (Nadine’s MacBook Pro)/Documents/Harvard/Physics/Caltech/chris_qldpc/exp_ldpc/scripts/nadine_bp/phi_distr_rust"
@@ -12,7 +13,6 @@ def actually_save_json(d, p, syndmeas):
         filename = f'{direc}/d_{d}_p_{p}_syndmeas_{syndmeas}_faultymeas.json'
         with open(filename, "w") as file:
             json.dump(data, file)
-
 
 def calc_phidistr(d, p, syndmeas, faulty=True):
     merged_data_nofailure = extract_data(d, p, syndmeas, failure=False, faulty=faulty)
@@ -85,4 +85,30 @@ def calc_problogfailure(merged_data_nofailure, merged_data_failure):
 #     actually_save_json(7, p, 95)
 
 
+def run_phi_distribution(d, p, syndmeas, definitely_run=False, samples=1000000):
+    filename = f'/Users/nadinemeister/Dropbox/My Mac (Nadine’s MacBook Pro)/Documents/Harvard/Physics/Caltech/chris_qldpc/exp_ldpc/scripts/nadine_bp/phi_distr_rust/d_{d}_p_{p}_syndmeas_{syndmeas}_faultymeas.json'
 
+    # TODO: assumes once its run, its generated... maybe not necessarily true
+    if definitely_run or not os.path.exists(filename):
+        print('did not find the filename path soooo running it again', filename)
+        current_directory = os.getcwd()
+        os.chdir('/Users/nadinemeister/Documents/Harvard/Physics/Caltech/chris_tempeh_computer/UFD/target/release')
+        # run it
+        command = f'./ufd {round(1.5*p, 10)} {p} 0 0 0 {d} {syndmeas} {samples} false UnionFind true Depolarizing RotatedSurfaceCode'
+
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+
+        if process.returncode == 0:
+            print("Command executed successfully!")
+            print("Output:", stdout.decode("utf-8"))
+        else:
+            print("Command failed!")
+            print("Error:", stderr.decode("utf-8"))
+
+        # generate file
+        actually_save_json(d, p, syndmeas)
+
+        os.chdir(current_directory)
+
+actually_save_json(5, 0.01125, 49)
