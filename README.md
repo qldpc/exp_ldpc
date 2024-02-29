@@ -3,7 +3,6 @@
 [![pytest](https://github.com/qldpc/exp_ldpc/actions/workflows/pytest.yml/badge.svg)](https://github.com/qldpc/exp_ldpc/actions/workflows/pytest.yml)
 
 This repository contains (WIP) research code related to practical implementation of general qLDPC codes.
-It is distributed under an MIT license and will eventually be publically open source, but for the moment I ask that you ask for permission before sharing the sources.
 
 Please look at the scripts in `/scripts` for usage instructions.
 
