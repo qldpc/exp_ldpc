@@ -6,9 +6,10 @@ import re
 import subprocess
 
 def actually_save_json(d, p, syndmeas):
-    direc = "/Users/nadinemeister/Dropbox/My Mac (Nadine’s MacBook Pro)/Documents/Harvard/Physics/Caltech/chris_qldpc/exp_ldpc/scripts/nadine_bp/phi_distr_rust"
+    direc = "/Users/nadinemeister/Dropbox/My Mac (Nadine’s MacBook Pro)/Documents/Harvard/Physics/Caltech/chris_qldpc/exp_ldpc/scripts/nadine_bp/phi_distr_rust_newhalf"
 
     data = calc_phidistr(d, p, syndmeas)
+    print(data)
     if len(data) != 0:
         filename = f'{direc}/d_{d}_p_{p}_syndmeas_{syndmeas}_faultymeas.json'
         with open(filename, "w") as file:
@@ -18,7 +19,6 @@ def calc_phidistr(d, p, syndmeas, faulty=True):
     merged_data_nofailure = extract_data(d, p, syndmeas, failure=False, faulty=faulty)
     merged_data_failure = extract_data(d, p, syndmeas, failure=True, faulty=faulty)
 
-    # get slope
     pr_log_failure = calc_problogfailure(merged_data_nofailure, merged_data_failure)
 
     # make dict
@@ -34,7 +34,7 @@ def extract_data(d, p, syndmeas, failure=True, faulty=False):
     # Directory where the files are located
     if faulty:
         directories = [
-            '/Users/nadinemeister/Dropbox/My Mac (Nadine’s MacBook Pro)/Documents/Harvard/Physics/Caltech/chris_tempeh_computer/UFD/phi_data']
+            '/Users/nadinemeister/Dropbox/My Mac (Nadine’s MacBook Pro)/Documents/Harvard/Physics/Caltech/chris_tempeh_computer/UFD/phi_data_newhalf_1e7']
 
     merged_data_failure = defaultdict(int)
 
@@ -62,10 +62,10 @@ def extract_data(d, p, syndmeas, failure=True, faulty=False):
                     file_contents = file.read()
 
                 # Parse the dictionary from the file contents
-                data_dict = ast.literal_eval(file_contents)
+                data_dict = ast.literal_eval(file_contents) #use json.load next time
 
                 # Merge the dictionary into the merged_data dictionary
-                for key, value in data_dict.items():
+                for key, value in data_dict.items(): # use one line next time
                     merged_data_failure.setdefault(key, 0)
                     merged_data_failure[key] += value
 
@@ -86,7 +86,7 @@ def calc_problogfailure(merged_data_nofailure, merged_data_failure):
 
 
 def run_phi_distribution(d, p, syndmeas, definitely_run=False, samples=1000000):
-    filename = f'/Users/nadinemeister/Dropbox/My Mac (Nadine’s MacBook Pro)/Documents/Harvard/Physics/Caltech/chris_qldpc/exp_ldpc/scripts/nadine_bp/phi_distr_rust/d_{d}_p_{p}_syndmeas_{syndmeas}_faultymeas.json'
+    filename = f'/Users/nadinemeister/Dropbox/My Mac (Nadine’s MacBook Pro)/Documents/Harvard/Physics/Caltech/chris_qldpc/exp_ldpc/scripts/nadine_bp/phi_distr_rust_newhalf/d_{d}_p_{p}_syndmeas_{syndmeas}_faultymeas.json'
 
     # TODO: assumes once its run, its generated... maybe not necessarily true
     if definitely_run or not os.path.exists(filename):
@@ -111,4 +111,11 @@ def run_phi_distribution(d, p, syndmeas, definitely_run=False, samples=1000000):
 
         os.chdir(current_directory)
 
-actually_save_json(5, 0.01125, 49)
+ps = [0.005, 0.006] #[0.007, 0.00761774, 0.00829, 0.009082158612021489, 0.01, 0.010900795329560196]
+for p in ps:
+    print('savinggg')
+    actually_save_json(7, p, 69)
+
+# ps = [0.00829, 0.009082158612021489, 0.01, 0.010900795329560196]
+# for p in ps:
+#     actually_save_json(5, p, 49)

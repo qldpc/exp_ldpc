@@ -1,17 +1,27 @@
 import qldpc
 from pathlib import Path, PosixPath
+from ldpc import bp_decoder, bposd_decoder
 from qldpc import SpacetimeCode
 from phi_distribution import *
+from time import time
+from phi_distribution_generatejson import *
+import cProfile, pstats, io
 import os
 
+import re
+from pstats import SortKey, Stats
 import numpy as np
-from ldpc import bp_decoder, bposd_decoder
+# from ldpc.osd import bposd_decoder
+import stim
+import qldpc2
+from qldpc2 import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpacetimeCode
+from typing import Callable, Dict, Tuple
 
 
-def decode_code(check_matrix, syndrome, prior, passin, iterations):
+def decode_code(check_matrix, syndrome, prior, passin, iterations, osd_method):
     # Decoder goes here
     # if passin:
-    bp = bp_decoder(check_matrix, channel_probs=prior, max_iter=iterations)#, bp_method='ms')
+    bp = bposd_decoder(check_matrix, channel_probs=prior, max_iter=iterations, osd_method=osd_method)#, bp_method='ms')
     # else:
     #     bp = bp_decoder(check_matrix, max_iter=iterations)
 
@@ -19,6 +29,7 @@ def decode_code(check_matrix, syndrome, prior, passin, iterations):
     # print(bp.iter)
     return correction
 
+# @njit
 def sample_error_prior(rng, size, phi_distr):
     # I hope 0 is no error, and 1 is error
     q_values, phi_freq = phi_distr
@@ -31,6 +42,7 @@ def sample_error_prior(rng, size, phi_distr):
     return error, prior
 
 oT = 100
+osd_method='osd_e'
 
 def run_simulation(samples, passin, code_path, d, p, r, num_samples, **kwargs):
 
@@ -40,7 +52,6 @@ def run_simulation(samples, passin, code_path, d, p, r, num_samples, **kwargs):
     # doing arbitrary 10 rounds of stabilizer measurements for now
     spacetime_code = SpacetimeCode(code.checks.z, oT)
 
-    np.random.seed(os.getpid())
     rng = np.random.default_rng()
     
     results = []
@@ -63,7 +74,7 @@ def run_simulation(samples, passin, code_path, d, p, r, num_samples, **kwargs):
             keys, normalized_freq = phi_distr
             prior_val = np.sum([keys[i]*normalized_freq[i] for i in range(len(keys))])
             prior = [prior_val] * len(prior)
-        correction = decode_code(spacetime_code.spacetime_check_matrix, syndrome, prior, passin, iterations=code.num_qubits) # a bunch of 0s when everything is correct
+        correction = decode_code(spacetime_code.spacetime_check_matrix, syndrome, prior, passin, iterations=code.num_qubits, osd_method=osd_method) # a bunch of 0s when everything is correct
 
         correction_single = spacetime_code.final_correction(correction)
         corrected_error = (spacetime_code.final_correction(error) + correction_single)%2
@@ -78,28 +89,29 @@ def run_simulation(samples, passin, code_path, d, p, r, num_samples, **kwargs):
 
 def main():
     code_path = PosixPath('new_lifted_product_code.qecc') #vars(args)['code_path']
-    samples = 100 #vars(args)['samples']
+    samples = 10 #vars(args)['samples']
     # 5000, 5000, 5000, 1000, 100, 10
     save_results = False
 
     # d = 7
     # r = 1
     # syndmeas = 69
-    #
-    # ps = [0.007, 0.00761774, 0.00829, 0.009082158612021489, 0.01, 0.010900795329560196]
+
+    #d=5, r=10
+    ps = [0.007, 0.00761774, 0.00829, 0.009082158612021489, 0.01, 0.010900795329560196]
     # p = 0.0054
 
     # ps = [0.0096, 0.01013319, 0.010696103757250688, 0.011440663558587229, 0.01223705244744459, 0.013088878266078581, 0.01360532]
 
     #d=5,r=1
-    ps = [0.00312, 0.00338, 0.0036, 0.003908133374595783, 0.0042426406871192875, 0.004605779351596908, 0.005, 0.0051,
-          0.0053, 0.015]
+    # ps = [0.00312, 0.00338, 0.0036, 0.003908133374595783, 0.0042426406871192875, 0.004605779351596908, 0.005, 0.0051,
+    #       0.0053, 0.015]
 
     d = 5
     r = 10
     # syndmeas = 49
     num_samples = '1e7'
-    p = 0.0049 #ps[0]
+    p = ps[2]
 
     # make sure phi distribution is there, if not, then run it, and then save it
     # run_phi_distribution(d, p, syndmeas, definitely_run=False, samples=1000000)
@@ -116,7 +128,7 @@ def main():
         print(f'after {samples*count} runs: {np.average(results)}')
 
         if save_results:
-            with open(f'bp_decoder_output_newhalfedge/d_{d}_p_{p}_r_{r}_passin_{passin}_oT_{oT}.txt', "w") as file:
+            with open(f'bposd_output/d_{d}_p_{p}_r_{r}_passin_{passin}_oT_{oT}_osd_{osd_method}.txt', "w") as file:
                 file.write(f'after {samples*count} runs: {np.average(results)}')
 
 
