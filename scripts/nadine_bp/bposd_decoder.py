@@ -1,21 +1,11 @@
 import qldpc
 from pathlib import Path, PosixPath
 from ldpc import bp_decoder, bposd_decoder
-from qldpc import SpacetimeCode
 from phi_distribution import *
-from time import time
-from phi_distribution_generatejson import *
-import cProfile, pstats, io
 import os
 
-import re
-from pstats import SortKey, Stats
 import numpy as np
-# from ldpc.osd import bposd_decoder
-import stim
-import qldpc2
-from qldpc2 import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpacetimeCode
-from typing import Callable, Dict, Tuple
+from qldpc import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpacetimeCode
 
 
 def decode_code(check_matrix, syndrome, prior, passin, iterations, osd_method):
