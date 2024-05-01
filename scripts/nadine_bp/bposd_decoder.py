@@ -26,13 +26,12 @@ def sample_error_prior(rng, size, phi_distr):
 
     # Sample from the distribution
     prior = rng.choice(q_values, p=phi_freq, size=size)
-    np.random.seed(os.getpid())
-    error = np.random.uniform(0.0, 1.0, size=prior.shape[0]) <= prior
+    error = rng.uniform(0.0, 1.0, size=prior.shape[0]) <= prior
 
     return error, prior
 
 oT = 100
-osd_method='osd_e'
+osd_method='osd_cs'
 
 def run_simulation(samples, passin, code_path, d, p, r, num_samples, **kwargs):
 
@@ -88,7 +87,7 @@ def main():
     # syndmeas = 69
 
     #d=5, r=10
-    ps = [0.007, 0.00761774, 0.00829, 0.009082158612021489, 0.01, 0.010900795329560196]
+    #ps = [ 0.0049 ]#[0.007, 0.00761774, 0.00829, 0.009082158612021489, 0.01, 0.010900795329560196]
     # p = 0.0054
 
     # ps = [0.0096, 0.01013319, 0.010696103757250688, 0.011440663558587229, 0.01223705244744459, 0.013088878266078581, 0.01360532]
@@ -100,8 +99,8 @@ def main():
     d = 5
     r = 10
     # syndmeas = 49
-    num_samples = '1e7'
-    p = ps[2]
+    num_samples = '1e6'
+    p = 0.0049
 
     # make sure phi distribution is there, if not, then run it, and then save it
     # run_phi_distribution(d, p, syndmeas, definitely_run=False, samples=1000000)

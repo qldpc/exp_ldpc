@@ -9,7 +9,7 @@ import numba
 from numba import njit, float64, intp, bool_
 
 def get_phidistr(d, p, num_meas, num_samples='1e6'):
-    filename = f'/Users/nadinemeister/Dropbox/My Mac (Nadine’s MacBook Pro)/Documents/Harvard/Physics/Caltech/chris_qldpc/exp_ldpc/scripts/nadine_bp/phi_distr_rust_newhalf/d_{d}_p_{p}_syndmeas_{num_meas}_faultymeas.json'
+    filename = f'./phi_distr_rust_newhalf/d_{d}_p_{p}_syndmeas_{num_meas}_faultymeas.json'
     # filename = f'/Users/nadinemeister/Dropbox/My Mac (Nadine’s MacBook Pro)/Documents/Harvard/Physics/Caltech/chris_qldpc/exp_ldpc/scripts/nadine_bp/phi_new_{num_samples}/d_{d}_p_{p}_syndmeas_{num_meas}_faultymeas_{num_samples}.json'
 
     with open(filename, "r") as data_file:
