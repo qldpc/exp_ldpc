@@ -12,13 +12,13 @@
 
 pythonPackages.buildPythonPackage rec {
   pname = "ldpc";
-  version = "1.9.0";
+  version = "0.1.51";
 
   src = pkgs.fetchFromGitHub {
     owner = "quantumgizmos";
     repo = "ldpc";
-    rev = "7909a97d4469dc0caa1eb2c9ac3fc0e0b6abb819";
-    sha256 = "sha256-/8ae64xy3IAR/0NLiKRmcZAKh/uLO5oDvxn46lNuWZI=";
+    rev = "cb462f0e262a7856796ebaef9a68181f5ffcddb1";
+    sha256 = "sha256-j07rwDKtjq9J+IoI7+fxyOm5hLmhGQRsZ8B0HZ5CMCI=";
   };
 
   buildInputs = [
