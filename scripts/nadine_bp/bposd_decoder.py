@@ -2,7 +2,9 @@ import qldpc
 from pathlib import Path, PosixPath
 from ldpc import bp_decoder, bposd_decoder
 from phi_distribution import *
+from multiprocessing import Pool, cpu_count
 import os
+
 
 import numpy as np
 from qldpc import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpacetimeCode
@@ -33,7 +35,7 @@ def sample_error_prior(rng, size, phi_distr):
 oT = 100
 osd_method='osd_cs'
 
-def run_simulation(samples, passin, code_path, d, p, r, num_samples, **kwargs):
+def run_simulation(samples, passin, code_path, d, p, r, num_samples):
 
     with code_path.open() as code_file:
         code = qldpc.read_quantum_code(code_file)
@@ -78,7 +80,7 @@ def run_simulation(samples, passin, code_path, d, p, r, num_samples, **kwargs):
 
 def main():
     code_path = PosixPath('new_lifted_product_code.qecc') #vars(args)['code_path']
-    samples = 10 #vars(args)['samples']
+    samples = 100 #vars(args)['samples']
     # 5000, 5000, 5000, 1000, 100, 10
     save_results = False
 
@@ -108,17 +110,19 @@ def main():
 
     passin = True
     print(f'p = {p}, d = {d}, pass_input={passin}')
-    results = []
+    result_list = []
     count = 0
-    while True:
-        count += 1
-        result = run_simulation(samples, passin, code_path, d, p, r, num_samples)
-        results.append(result)
-        print(f'after {samples*count} runs: {np.average(results)}')
+    process_count = cpu_count()
+    with Pool(process_count) as pool:        
+        while True:
+            result = pool.starmap(run_simulation, [(samples, passin, code_path, d, p, r, num_samples)]*process_count)
+            count += len(result)
+            result_list.extend(result)
+            print(f'after {samples*count} runs: {np.average(result_list)}')
 
-        if save_results:
-            with open(f'bposd_output/d_{d}_p_{p}_r_{r}_passin_{passin}_oT_{oT}_osd_{osd_method}.txt', "w") as file:
-                file.write(f'after {samples*count} runs: {np.average(results)}')
+            if save_results:
+                with open(f'bposd_output/d_{d}_p_{p}_r_{r}_passin_{passin}_oT_{oT}_osd_{osd_method}.txt', "w") as file:
+                    file.write(f'after {samples*count} runs: {np.average(result_list)}')
 
 
 if __name__ == '__main__':
