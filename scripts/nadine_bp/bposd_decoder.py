@@ -4,22 +4,10 @@ from ldpc import bp_decoder, bposd_decoder
 from phi_distribution import *
 from multiprocessing import Pool, cpu_count
 import os
-
+from datetime import datetime
 
 import numpy as np
 from qldpc import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpacetimeCode
-
-
-def decode_code(check_matrix, syndrome, prior, passin, iterations, osd_method):
-    # Decoder goes here
-    # if passin:
-    bp = bposd_decoder(check_matrix, channel_probs=prior, max_iter=iterations, osd_method=osd_method)#, bp_method='ms')
-    # else:
-    #     bp = bp_decoder(check_matrix, max_iter=iterations)
-
-    correction = bp.decode(syndrome)
-    # print(bp.iter)
-    return correction
 
 # @njit
 def sample_error_prior(rng, size, phi_distr):
@@ -33,7 +21,6 @@ def sample_error_prior(rng, size, phi_distr):
     return error, prior
 
 oT = 100
-osd_method='osd_cs'
 
 def run_simulation(samples, passin, code_path, d, p, r, num_samples):
 
@@ -50,6 +37,10 @@ def run_simulation(samples, passin, code_path, d, p, r, num_samples):
     tau = int(np.ceil(3*np.sqrt(code.num_qubits)*d/r)) #num syndrome rounds
     phi_distr = get_phidistr(d, p, tau, num_samples)
 
+    bp = bposd_decoder(spacetime_code.spacetime_check_matrix, max_iter=1000,
+                       osd_method='osd_0', bp_method='msl', ms_scaling_factor=0.625)
+
+    bp_converged = 0
     for _ in range(samples):
         # sample phi - number of qubits in the qLDPC code times
         error, prior = sample_error_prior(rng, spacetime_code.spacetime_check_matrix.shape[1], phi_distr)
@@ -65,7 +56,10 @@ def run_simulation(samples, passin, code_path, d, p, r, num_samples):
             keys, normalized_freq = phi_distr
             prior_val = np.sum([keys[i]*normalized_freq[i] for i in range(len(keys))])
             prior = [prior_val] * len(prior)
-        correction = decode_code(spacetime_code.spacetime_check_matrix, syndrome, prior, passin, iterations=code.num_qubits, osd_method=osd_method) # a bunch of 0s when everything is correct
+
+        bp.update_channel_probs(prior)
+        correction = bp.decode(syndrome)
+        bp_converged += bp.converge
 
         correction_single = spacetime_code.final_correction(correction)
         corrected_error = (spacetime_code.final_correction(error) + correction_single)%2
@@ -75,12 +69,12 @@ def run_simulation(samples, passin, code_path, d, p, r, num_samples):
 
     percentage_false = sum(value == False for value in results) / len(results) * 100
 
-    print('percentage logically corrected', percentage_false)
+    print(f'percentage logically corrected {percentage_false}. BP converged {bp_converged/len(results)}')
     return percentage_false
 
 def main():
     code_path = PosixPath('new_lifted_product_code.qecc') #vars(args)['code_path']
-    samples = 100 #vars(args)['samples']
+    samples = 400 #vars(args)['samples']
     # 5000, 5000, 5000, 1000, 100, 10
     save_results = False
 
@@ -113,27 +107,23 @@ def main():
     result_list = []
     count = 0
     process_count = cpu_count()
-    with Pool(process_count) as pool:        
+    with Pool(process_count) as pool:
+        starttime = datetime.now()
         while True:
             result = pool.starmap(run_simulation, [(samples, passin, code_path, d, p, r, num_samples)]*process_count)
-            count += len(result)
             result_list.extend(result)
-            print(f'after {samples*count} runs: {np.average(result_list)}')
+            tot_samples = len(result_list)*samples
+
+            elapsed = datetime.now()-starttime
+            print(f'after {tot_samples} ({tot_samples/elapsed.total_seconds():.2f} samples/s) runs: {np.average(result_list)}')
 
             if save_results:
                 with open(f'bposd_output/d_{d}_p_{p}_r_{r}_passin_{passin}_oT_{oT}_osd_{osd_method}.txt', "w") as file:
-                    file.write(f'after {samples*count} runs: {np.average(result_list)}')
+                    file.write(f'after {tot_samples} runs: {np.average(result_list)}')
 
 
 if __name__ == '__main__':
-    # profile.run('main()')
+    # import cProfile
+    # cProfile.run('main()')
     main()
-    # pr = cProfile.Profile()
-    # pr.enable()
-    # main()
-    # pr.disable()
-    # s = io.StringIO()
-    # sortby = SortKey.TIME
-    # ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-    # ps.print_stats()
-    # print(s.getvalue())
+    
