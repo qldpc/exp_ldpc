@@ -5,6 +5,7 @@
 , pytestCheckHook
 , pytest-xdist
 , fetchFromGitHub
+, substituteAll
 , numpy
 , pybind11
 , cirq-core
@@ -17,7 +18,7 @@
 
 buildPythonPackage rec {
   pname = "stim";
-  version = "1.11.0";
+  version = "1.13.0";
   format = "pyproject";
 
   disabled = pythonOlder "3.6";
@@ -26,8 +27,14 @@ buildPythonPackage rec {
     owner = "quantumlib";
     repo = "Stim";
     rev = "refs/tags/v${version}";
-    hash = "sha256-aBBfloINUwdWgKz6NrKa/BH/teZhF8qTqc/N5ohMUUA";
+    hash = "sha256-anJvDHLZ470iNw0U7hq9xGBacDgqYO9ZcmmdCt9pefg=";
   };
+
+  patches = [
+    (substituteAll {
+      src = ./0001-relax-pybind11-dep-in-pyproject.toml.patch;
+    })
+  ];
 
   nativeBuildInputs = [
     setuptools
@@ -47,6 +54,10 @@ buildPythonPackage rec {
     networkx
     scipy
     pandas
+  ];
+
+  pythonRelaxDeps = [
+    "pybind11"
   ];
 
   meta = {
