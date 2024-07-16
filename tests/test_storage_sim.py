@@ -100,9 +100,9 @@ def test_ancilla_targets():
     assert len(measurement_order) == code.checks.x.shape[0] + code.checks.z.shape[0]
     for (i,m) in enumerate(measurement_order):
         if m in x_ancilla_idx:
-            assert CX_targets[m] == set(code.checks.x[i,:].nonzero()[1])
+            assert CX_targets[m] == set(code.checks.x[[i],:].nonzero()[1])
         else:
-            assert CZ_targets[m] == set(code.checks.z[i-code.checks.x.shape[0],:].nonzero()[1])
+            assert CZ_targets[m] == set(code.checks.z[[i-code.checks.x.shape[0]],:].nonzero()[1])
 
 storage_sim_test_matrix = [(use_x_logicals, rounds) for use_x_logicals in [True,False] for rounds in [0,3]]
 

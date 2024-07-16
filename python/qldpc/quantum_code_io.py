@@ -67,5 +67,5 @@ def write_quantum_code(stream : IOBase, code : QuantumCode):
     # Check generators for each type
     for (entry_type, matrix) in (('X', code.checks.x), ('Z', code.checks.z), ('LZ', code.logicals.z), ('LX', code.logicals.x)):
         for row_index in range(num_rows(matrix)):
-            col_list = " ".join(str(col) for col in sparse.find(matrix[row_index, :])[1])
+            col_list = " ".join(str(col) for col in sparse.find(matrix[[row_index], :])[1])
             stream.write(f'{col_list} {entry_type}\n')
