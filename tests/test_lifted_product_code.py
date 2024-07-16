@@ -1,4 +1,4 @@
-from qldpc.lifted_product_code import random_abelian_generators, morgenstern_generators, _dfs_generators
+from qldpc.lifted_product_code import random_abelian_generators, morgenstern_generators, _dfs_generators, get_psl2
 from qldpc import lifted_product_code_cyclic, lifted_product_code_pgl2
 
 def test_random_abelian_generators():
@@ -34,6 +34,14 @@ def test_morgenstern_B_generators():
     q = (2**l)**i
     assert len(group_elements) == (q-1)*q*(q+1)
 
+def test_get_psl2():
+    for q in [2,3,4,5,9]:
+        group_elements = get_psl2(q)
+        if (q%2) == 0:
+          assert len(group_elements) == (q-1)*q*(q+1)
+        else:
+          assert len(group_elements) == (q-1)*q*(q+1)//2
+    
 def test_lifted_product_code_cyclic():
     # Parameters from Higgot and Breuckmann
     w = 14

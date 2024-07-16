@@ -73,9 +73,12 @@ class GL2(Group):
     def __repr__(self):
         return repr(self.data)
 
+    def det(self):
+        return np.linalg.det(self.data)
+
 
 class PGL2(GL2):
-    '''PGL(2,q) WIP. The quotient still needs to be implemented'''
+    '''PGL(2,q)'''
     def __init__(self, gf : FieldArray, data : FieldArray, canonicalized=None):
         if canonicalized is None:
             canonicalized = False
@@ -198,6 +201,15 @@ def morgenstern_generators(l, i, use_B_generators = None, symmetric = None) -> L
         generators = [a@b for i, a in enumerate(generators) for j, b in enumerate(generators) if i!=j and (i<j or symmetric)]
 
     return generators
+
+def get_psl2(q):
+    '''Returns all elements of PSL(2,q) with coefficients in the given field. Not very elegant and takes time O(q^4)'''
+    Fq = GF(q)
+    return frozenset(map(lambda x: PGL2(Fq, x.data), filter((lambda x: x.det() == 1), (GL2(Fq, Fq([[a,b],[c,d]]))
+        for a in Fq.elements
+        for b in Fq.elements
+        for c in Fq.elements
+        for d in Fq.elements))))
 
 def _dfs_generators(root : Group, generators : List[Group], traverse=None) -> Set[Group]:
     '''DFS traversal of the group from root using supplied generators acting from the left. A custom multiplication can be provided by passing traverse'''
