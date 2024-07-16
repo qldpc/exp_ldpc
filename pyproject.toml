@@ -3,9 +3,9 @@ name = "qldpc"
 dependencies = [
 "galois",
 # numpy does not use SemVer :(
-"numpy>=1.21&&<1.24",
-"scipy>=1.7",
-"networkx>=2.6,<3.0",
+"numpy~=1.26",
+"scipy~=1.13",
+"networkx>=3",
 ]
 
 [build-system]
