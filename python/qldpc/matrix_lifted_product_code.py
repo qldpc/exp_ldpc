@@ -1,13 +1,16 @@
 from .homological_product_code import homological_product, get_logicals
 from .qecc_util import QuantumCode, QuantumCodeChecks
 from .lifted_product_code import Group
-from galois import Poly, GF2, FieldArray
+from galois import Poly, GF2, FieldArray, GF
+from galois.typing import ElementLike
 import numpy as np
 import scipy.linalg as linalg
 import scipy.sparse as sparse
 import warnings
+from functools import reduce
 from typing import Dict, List
-    
+from copy import deepcopy
+
 class GroupAlgebra:
     scalar_field : FieldArray
     _data : Dict[Group, FieldArray]
@@ -17,25 +20,40 @@ class GroupAlgebra:
         self._data = data
         self.canonicalize()
     
-    def __matmul__(self, other):
+    def _mul_GA(self, other):
         assert self.scalar_field == other.scalar_field
-        return GroupAlgebra(self.scalar_field, {(a@b):v*u for (a,v) in self._data.items() for (b,u) in other._data.items()})
-  
+        output_dict = {}
+        zero = self.scalar_field.Zeros(1)[0]
+        for (a,v) in self._data.items():
+          for (b,u) in other._data.items():
+            c = a@b
+            output_dict[c] = output_dict.get(c,zero) + v*u
+        return GroupAlgebra(self.scalar_field, output_dict)
+
+    def _mul_scalar(self,other):
+        return GroupAlgebra(self.scalar_field, {a:u*other for (a,u) in self._data.items()})
+    
+    def __mul__(self, other : ElementLike):
+        if isinstance(other,GroupAlgebra):
+            return self._mul_GA(other)
+        else:
+            return self._mul_scalar(other)
+    
     def __add__(self, other):
-        zero = self.scalar_field(1)
+        zero = self.scalar_field.Zeros(1)[0]
         keys = frozenset(self._data.keys()) | frozenset(other._data.keys())
         return GroupAlgebra(self.scalar_field, {k:(self.get(k, zero) + other.get(k, zero)) for k in keys})
   
     def antipode(self):
         '''Antipode map that takes each basis element to its multiplicative inverse'''
-        return GroupAlgebra(self.scalar_field, {a.inv():u for (a,b) in self._data.items()})
+        return GroupAlgebra(self.scalar_field, {a.inv():u for (a,u) in self._data.items()})
     
     def canonicalize(self):
-        self._data = dict(filter(lambda x: x != self.scalar_field(0), self._data.items()))
+        self._data = dict(filter(lambda x: x[1] != self.scalar_field.Zeros(1)[0], self._data.items()))
 
     def terms(self):
         '''Returns a dict of nonzero entries and their coefficient'''
-        return copy(self._data)
+        return deepcopy(self._data)
 
 def group_algebra_zero(gf):
     return GroupAlgebra(gf, {})
@@ -65,28 +83,33 @@ class RegularRep:
         self._left_action = left_action
         self._matrices = {}
 
-    def get_repp(self, element : Group):
+    def zero(self):
+        '''Returns a zero matrix of the same shape as the matrix representation'''
+        n = len(self._group)
+        return self._field.Zeros((n,n))
+
+    def get_rep(self, element : Group):
         '''Returns a 0/1 matrix representation of the given element with entries in a finite field'''
         if element not in self._matrices:
             # Construct element lazily
-            n = len(self._group)
-            mat = self._field.Zeros((n,n))
-            for g in _group:
+            mat = self.zero()
+            one = self._field.Ones(1)[0]
+            for g in self._group:
                 h = element @ g if self._left_action else g @ element
-                mat[self._group_indices[h], self._group_indices[g]] = self._field(1)
+                mat[self._group_indices[h], self._group_indices[g]] = one
             self._matrices[element] = mat
 
         return self._matrices[element]
-
 
 def matrix_lifted_product_code(group, base_matrix, check_complex=None, compute_logicals=None) -> QuantumCode:
     '''
     Returns a lifted product code constructed as a lift of a base matrix.
     The input matrix is an n x m check matrix with elements in a group algebra.
+    The base matrix must be a group algebra over F2, but this is not enforced currently
     '''
 
-    assert not base_matrix[0,0].scalar_field.is_extension_field
-    assert base_matrix[0,0].scalar_field.characteristic == 2
+    # assert not base_matrix[0,0].scalar_field.is_extension_field
+    # assert base_matrix[0,0].scalar_field.characteristic == 2
     
     if check_complex is None:
         check_complex = False
@@ -96,12 +119,16 @@ def matrix_lifted_product_code(group, base_matrix, check_complex=None, compute_l
         
     base_matrix = np.array(base_matrix)
     representation = RegularRep(group)
+
+    field_one = base_matrix[0,0].scalar_field.Ones(1)[0]
     
     def identity(size):
-        return np.identity(size, dtype=np.uint32)*np.array(Poly.One())
+        group_id = group[0].identity()
+        ga_one = group_algebra_monomial(field_one, group_id)
+        return np.vectorize(lambda x: ga_one*x)(field_one.Identity(size))
 
     def group_alg_to_matrix(a):
-        return sum(map(lambda x: x[1]*representation.get_rep(x[0]), a.terms().items()))
+        return sum(map(lambda x: x[1]*representation.get_rep(x[0]), a.terms().items()), representation.zero())
     
     def embed_binary_matrix(a):
         a_blocks = [[group_alg_to_matrix(x) for x in row] for row in a]
