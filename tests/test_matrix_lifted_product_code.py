@@ -13,3 +13,29 @@ def test_matrix_lifted_product_code_Z31():
     assert code.num_logicals == 140
     
     
+def test_matrix_lifted_product_code_B3():
+    # From PK'19 arXiv:1904.02703
+    # B3
+    Z127 = [lp.Zqm(127,1,np.array([a],dtype=int)) for a in range(127)]
+
+    def monomial(g):
+        return mlp.group_algebra_monomial(GF2(1),g)
+    shift = lambda i: monomial(Z127[i])
+    zero = shift(0)*0
+    one = shift(1)
+
+    base_matrix_A = np.array(
+        [[shift(  0),       zero, shift( 51), shift( 52),       zero],
+         [      zero, shift(  0),       zero, shift(111), shift( 20)],
+         [shift(  0),       zero, shift( 98),       zero, shift(122)],
+         [shift(  0), shift( 80),       zero, shift(119),       zero],
+         [      zero, shift(  0), shift(  5),       zero, shift(106)],])
+
+
+    # Paper shows B should be proportional to 5x5 identity, but counting shows that B should be 1x1
+    Bscale = shift(0) + shift(1) + shift(7)
+    base_matrix_B = np.vectorize(lambda x: Bscale*x)(GF2.Identity(1))
+    
+    code = mlp.matrix_lifted_product_code(Z127, base_matrix_A, base_matrix_B, check_complex=True, compute_logicals=True)
+    assert code.num_qubits == 1270
+    assert code.num_logicals == 28

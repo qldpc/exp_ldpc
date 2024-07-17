@@ -42,14 +42,15 @@ class GroupAlgebra:
     def __add__(self, other):
         zero = self.scalar_field.Zeros(1)[0]
         keys = frozenset(self._data.keys()) | frozenset(other._data.keys())
-        return GroupAlgebra(self.scalar_field, {k:(self.get(k, zero) + other.get(k, zero)) for k in keys})
+        return GroupAlgebra(self.scalar_field, {k:(self._data.get(k, zero) + other._data.get(k, zero)) for k in keys})
   
     def antipode(self):
         '''Antipode map that takes each basis element to its multiplicative inverse'''
         return GroupAlgebra(self.scalar_field, {a.inv():u for (a,u) in self._data.items()})
     
     def canonicalize(self):
-        self._data = dict(filter(lambda x: x[1] != self.scalar_field.Zeros(1)[0], self._data.items()))
+        zero = self.scalar_field.Zeros(1)[0]
+        self._data = dict(filter(lambda x: x[1] != zero, self._data.items()))
 
     def terms(self):
         '''Returns a dict of nonzero entries and their coefficient'''
@@ -101,26 +102,62 @@ class RegularRep:
 
         return self._matrices[element]
 
-def matrix_lifted_product_code(group, base_matrix, check_complex=None, compute_logicals=None) -> QuantumCode:
+def matrix_lifted_product_code(group, base_matrix_A, base_matrix_B=None, dual_A=None, dual_B = None, check_complex=None, compute_logicals=None) -> QuantumCode:
     '''
     Returns a lifted product code constructed as a lift of a base matrix.
     The input matrix is an n x m check matrix with elements in a group algebra.
     The base matrix must be a group algebra over F2, but this is not enforced currently
+
+    If B is not given, then we will use B = A*
+    If dual_A or dual_B is pass, the transpose and antipode map will be applied
+
+    Base matrices are the map defining length-1 chain complexes from which we will take the standard tensor product of chain complexes
+    A: A1 -> A0
+    B: B1 -> B0
     '''
 
     # assert not base_matrix[0,0].scalar_field.is_extension_field
     # assert base_matrix[0,0].scalar_field.characteristic == 2
-    
+
+    # Defaults 
     if check_complex is None:
         check_complex = False
         
     if compute_logicals is None:
         compute_logicals = False
-        
-    base_matrix = np.array(base_matrix)
-    representation = RegularRep(group)
 
-    field_one = base_matrix[0,0].scalar_field.Ones(1)[0]
+    
+    if base_matrix_B is None:
+        assert dual_B is None and dual_A is None
+    if dual_A is None:
+        dual_A = False
+    if dual_B is None:
+        dual_B = False
+
+    #  -----
+    # Map from provided base matrices to boundary operator of the chain complex
+    # Optionally take dual of base matrices
+    def dual(a):
+        return np.vectorize(lambda x: x.antipode())(np.transpose(a))
+
+    base_matrix_A = np.array(base_matrix_A)
+    field_one = base_matrix_A[0,0].scalar_field.Ones(1)[0]
+    
+    partial_A = np.array(base_matrix_A)
+    if base_matrix_B is not None:
+        partial_B = np.array(base_matrix_B)
+    else:
+        partial_B = dual(partial_A)
+
+    if dual_A:
+        partial_A = dual(partial_A)
+    if dual_B:
+        partial_B = dual(partial_B)
+
+    #  -----
+    # Construct representation as permutation matrices
+    
+    representation = RegularRep(group)
     
     def identity(size):
         group_id = group[0].identity()
@@ -134,10 +171,9 @@ def matrix_lifted_product_code(group, base_matrix, check_complex=None, compute_l
         a_blocks = [[group_alg_to_matrix(x) for x in row] for row in a]
         return np.asarray(np.block(a_blocks))
 
-    
-    partial_A = base_matrix
-    partial_B = np.vectorize(lambda x: x.antipode())(np.transpose(base_matrix))
+    #  -----
 
+    # Build complex
     # D^A x I + I x D^B : A_1 x B_1 -> A_0 x B_1 + A_1 x B_0
     partial_2 = embed_binary_matrix(np.vstack([
         np.kron(partial_A, identity(partial_B.shape[1])),
