@@ -40,6 +40,10 @@ def test_matrix_lifted_product_code_B3():
     assert code.num_qubits == 1270
     assert code.num_logicals == 28
 
+def test_psl_lift():
+    group = list(lp.get_psl2(5))
+    
+    
 def test_regular_repp():
     group = lp.get_psl2(5)
     rep = mlp.RegularRep(group)

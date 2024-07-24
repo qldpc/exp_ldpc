@@ -69,9 +69,9 @@ class RegularRep:
     _group_indices : Dict[Group, int]
     _matrices : Dict[Group, FieldArray]
     _field : FieldArray
-    _left_action : bool
+    _right_action : bool
     
-    def __init__(self, group : List[Group], field = None, left_action = None):
+    def __init__(self, group : List[Group], field = None, right_action = None):
         self._group = group
         self._group_indices = dict(map(lambda x: (x[1],x[0]), enumerate(self._group)))
 
@@ -79,9 +79,9 @@ class RegularRep:
             field = GF2
         self._field = field
         
-        if left_action is None:
-            left_action = True
-        self._left_action = left_action
+        if right_action is None:
+            right_action = False
+        self._right_action = right_action
         self._matrices = {}
 
     def zero(self):
@@ -96,7 +96,7 @@ class RegularRep:
             mat = self.zero()
             one = self._field.Ones(1)[0]
             for g in self._group:
-                h = element @ g if self._left_action else g @ element
+                h = g @ element if self._right_action else element @ g
                 mat[self._group_indices[h], self._group_indices[g]] = one
             self._matrices[element] = mat
 
@@ -157,18 +157,19 @@ def matrix_lifted_product_code(group, base_matrix_A, base_matrix_B=None, dual_A=
     #  -----
     # Construct representation as permutation matrices
     
-    representation = RegularRep(group)
+    left_rep = RegularRep(group)
+    right_rep = RegularRep(group, right_action=True)
     
     def identity(size):
         group_id = group[0].identity()
         ga_one = group_algebra_monomial(field_one, group_id)
         return np.vectorize(lambda x: ga_one*x)(field_one.Identity(size))
 
-    def group_alg_to_matrix(a):
-        return sum(map(lambda x: x[1]*representation.get_rep(x[0]), a.terms().items()), representation.zero())
+    def group_alg_to_matrix(a, rep):
+        return sum(map(lambda x: x[1]*rep.get_rep(x[0]), a.terms().items()), representation.zero())
     
-    def embed_binary_matrix(a):
-        a_blocks = [[group_alg_to_matrix(x) for x in row] for row in a]
+    def embed_binary_matrix(a, rep):
+        a_blocks = [[group_alg_to_matrix(x,rep) for x in row] for row in a]
         return np.asarray(np.block(a_blocks))
 
     #  -----
@@ -178,12 +179,12 @@ def matrix_lifted_product_code(group, base_matrix_A, base_matrix_B=None, dual_A=
     partial_2 = embed_binary_matrix(np.vstack([
         np.kron(partial_A, identity(partial_B.shape[1])),
         np.kron(identity(partial_A.shape[1]), partial_B)
-    ]))
+    ]), left_rep)
     
     partial_1 = embed_binary_matrix(np.hstack([
         np.kron(identity(partial_A.shape[0]), partial_B),
         np.kron(partial_A, identity(partial_B.shape[0]))
-    ]))
+    ]), left_rep)
 
     # The rest of the package works with integer matrices
     partial_1 = np.array(partial_1, dtype=np.uint8)
