@@ -42,6 +42,24 @@ def test_matrix_lifted_product_code_B3():
 
 def test_psl_lift():
     group = list(lp.get_psl2(5))
+    def monomial(g):
+        return mlp.group_algebra_monomial(GF2(1),g)
+    one = monomial(group[0].identity())
+    zero = one*0
+
+    base_matrix_elements = np.array(
+        [[32, 56,  9,  4, 55,  6,],
+         [31, 13, 45, 13,  2, 10,],
+         [32,  5, 51, 49, 18, 26,],])
+
+    # Convert to group algebra elements
+    base_matrix = np.vectorize(lambda i: monomial(group[i]))(base_matrix_elements)
+
+    code = mlp.matrix_lifted_product_code(group, base_matrix_A = base_matrix, check_complex=True, compute_logicals=True)
+
+    # Untrusted result, but at least we will know if it changes
+    assert code.num_qubits == 2700
+    assert code.num_logicals == 560 
     
     
 def test_regular_repp():

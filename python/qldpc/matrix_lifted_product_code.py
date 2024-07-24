@@ -166,7 +166,7 @@ def matrix_lifted_product_code(group, base_matrix_A, base_matrix_B=None, dual_A=
         return np.vectorize(lambda x: ga_one*x)(field_one.Identity(size))
 
     def group_alg_to_matrix(a, rep):
-        return sum(map(lambda x: x[1]*rep.get_rep(x[0]), a.terms().items()), representation.zero())
+        return sum(map(lambda x: x[1]*rep.get_rep(x[0]), a.terms().items()), rep.zero())
     
     def embed_binary_matrix(a, rep):
         a_blocks = [[group_alg_to_matrix(x,rep) for x in row] for row in a]
@@ -176,15 +176,25 @@ def matrix_lifted_product_code(group, base_matrix_A, base_matrix_B=None, dual_A=
 
     # Build complex
     # D^A x I + I x D^B : A_1 x B_1 -> A_0 x B_1 + A_1 x B_0
-    partial_2 = embed_binary_matrix(np.vstack([
-        np.kron(partial_A, identity(partial_B.shape[1])),
-        np.kron(identity(partial_A.shape[1]), partial_B)
-    ]), left_rep)
+    # partial_2 = embed_binary_matrix(np.vstack([
+    #     np.kron(partial_A, identity(partial_B.shape[1])),
+    #     np.kron(identity(partial_A.shape[1]), partial_B)
+    # ]), left_rep)
     
-    partial_1 = embed_binary_matrix(np.hstack([
-        np.kron(identity(partial_A.shape[0]), partial_B),
-        np.kron(partial_A, identity(partial_B.shape[0]))
-    ]), left_rep)
+    # partial_1 = embed_binary_matrix(np.hstack([
+    #     np.kron(identity(partial_A.shape[0]), partial_B),
+    #     np.kron(partial_A, identity(partial_B.shape[0]))
+    # ]), left_rep)
+
+    partial_2 = np.vstack([
+        embed_binary_matrix(np.kron(partial_A, identity(partial_B.shape[1])), left_rep),
+        embed_binary_matrix(np.kron(identity(partial_A.shape[1]), partial_B), right_rep),
+    ])
+    
+    partial_1 = np.hstack([
+        embed_binary_matrix(np.kron(identity(partial_A.shape[0]), partial_B), right_rep),
+        embed_binary_matrix(np.kron(partial_A, identity(partial_B.shape[0])), left_rep),
+    ])
 
     # The rest of the package works with integer matrices
     partial_1 = np.array(partial_1, dtype=np.uint8)
