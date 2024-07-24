@@ -39,3 +39,21 @@ def test_matrix_lifted_product_code_B3():
     code = mlp.matrix_lifted_product_code(Z127, base_matrix_A, base_matrix_B, check_complex=True, compute_logicals=True)
     assert code.num_qubits == 1270
     assert code.num_logicals == 28
+
+def test_regular_repp():
+    group = lp.get_psl2(5)
+    rep = mlp.RegularRep(group)
+    table = {}
+    
+    # Populate
+    for g in group:
+        m = rep.get_rep(g)
+        assert np.all(np.count_nonzero(m==GF2(1),axis=0))
+        assert np.all(np.count_nonzero(m==GF2(1),axis=1))
+        table[g] = m
+    # Check multiplication table
+    for g in group:
+        for h in group:
+            p = g@h
+            assert np.all(table[p] == table[g]@table[h])
+        
