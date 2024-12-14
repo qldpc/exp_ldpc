@@ -49,7 +49,7 @@ class SpacetimeCode:
 
         # Stack copies of the checks
         check_matrix_coo = check_matrix.tocoo()
-        spacetime_check_matrix = sparse.block_diag(repeat(check_matrix_coo, num_rounds+1))
+        spacetime_check_matrix = sparse.block_diag(repeat(check_matrix_coo, num_rounds+1)) if num_rounds > 0 else check_matrix_coo
 
         r = check_matrix.shape[0]
 
