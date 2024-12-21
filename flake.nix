@@ -1,7 +1,7 @@
 {
   description = "A very basic flake";
 
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/release-24.05";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/release-24.11";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
   outputs = { self, nixpkgs, flake-utils }:

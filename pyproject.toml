@@ -1,5 +1,7 @@
 [project]
 name = "qldpc"
+version = "0.10.0"
+
 dependencies = [
 "galois",
 # numpy does not use SemVer :(
@@ -9,10 +11,10 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["maturin>=0.13,<0.14"]
-build-backend = "maturin"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
 
-[tool.maturin]
-# Require that Cargo.lock is up to date
-locked = true
-python-source = "python"
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+packages = ["qldpc"]
