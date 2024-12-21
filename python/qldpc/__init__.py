@@ -11,10 +11,3 @@ from .spacetime_code import SpacetimeCode, SpacetimeCodeSingleShot, DetectorSpac
 from . import noise_model
 from . import code_examples
 from . import lifted_product_code
-
-# Import decoders but don't blow up if we want to use some of the other routines without compiling the decoder library
-import warnings
-try:
-    from .qldpc import ErrorCorrectingCode, FirstMinBeliefProp, SmallSetFlip, FirstMinBPplusSSF
-except (ModuleNotFoundError, ImportError) as e:
-    warnings.warn(f'Unable to import qldpc decoder library: {e}')
